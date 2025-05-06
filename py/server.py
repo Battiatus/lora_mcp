@@ -11,6 +11,9 @@ from google.genai import types
 from mcp.server.fastmcp import FastMCP
 import nest_asyncio
 
+from dotenv import load_dotenv
+load_dotenv()  
+
 # Apply nest_asyncio
 nest_asyncio.apply()
 
