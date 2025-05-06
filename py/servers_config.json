@@ -2,8 +2,11 @@
     "geminiServer": {
       "name": "gemini_llm_server",
       "config": {
-        "script_path": "gemini_server.py",
-        "env": {}
+        "script_path": "server.py",
+        "env": {
+          "GOOGLE_CLOUD_PROJECT": "io-mcp-llm",
+          "GOOGLE_CLOUD_LOCATION": "europe-west9"       
+        }
       }
     }
   }
