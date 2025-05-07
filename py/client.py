@@ -1,4 +1,3 @@
-
 import asyncio
 from contextlib import AsyncExitStack
 import json
@@ -7,23 +6,50 @@ import os
 import re
 import shutil
 import sys
-from typing import Any, Dict, List, Optional
+import base64
+import copy
+import uuid
+from typing import Any, Dict, List, Optional, Union
+import traceback
 
-# Import necessary MCP components (ensure 'mcp' is installed)
+# Import necessary components
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from pydantic.networks import AnyUrl
 
 # Ensure MCP library is installed: pip install mcp
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.types import ListToolsResult, Tool as MCPTool, CallToolResult, ReadResourceResult, TextResourceContents
 
 # Configure logging - Set default level to INFO
-# Change to logging.WARNING or logging.ERROR to hide more messages
 logging.basicConfig(
     level=logging.ERROR, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+# Constants for conversation management
+SUMMARIZATION_TOKEN_THRESHOLD = 50000  # Threshold for triggering summarization
+KEEP_LAST_TURNS = 10  # Number of recent turns to keep intact during summarization
+
+# System prompt that instructs the model how to use the tools
+SYSTEM_PROMPT = """You are a web navigation assistant with vision capabilities.
+When you don't know something DO NOT stop or make assumptions, ASK the user for feedback so we can continue.
+When you see a screenshot, analyze it carefully to identify elements and their positions.
+First click on elements like form fields, then use the type tool to enter text. You can submit forms by setting submit=true when typing.
+When you see a captcha ask the user to resolve it before continuing.
+You can scroll up or down to see more content on the page.
+After completing your search, use the write_file tool to save your findings in markdown format.
+Think step by step and take screenshots between each step to ensure you are doing what you think you are doing.
+
+When you need to use a tool, you must ONLY respond with the exact format below, nothing else:
+{
+    "tool": "tool-name",
+    "arguments": {
+        "argument-name": "value"
+    }
+}
+"""
 
 # --- Configuration Class ---
 class Configuration:
@@ -76,6 +102,7 @@ class Server:
         self.session: Optional[ClientSession] = None
         self._cleanup_lock: asyncio.Lock = asyncio.Lock()
         self.exit_stack: AsyncExitStack = AsyncExitStack()
+        self.artifact_uris: List[AnyUrl] = []  # Track artifact URIs
 
     async def initialize(self) -> None:
         """Initializes the server connection."""
@@ -111,10 +138,6 @@ class Server:
         # Errors during subprocess creation
         # (by stdio_client or underlying OS calls)
         except FileNotFoundError as e:
-            # This could occur if 'command' (python)
-            # is somehow not found despite shutil.which,
-            # or if mcp internals try to access
-            # a file that doesn't exist based on params.
             logging.error(
                 f"Error initializing server {self.name}: "
                 "Command or script file not found. "
@@ -124,8 +147,6 @@ class Server:
             await self.cleanup()
             raise
         except PermissionError as e:
-            # Insufficient permissions to execute the
-            # python interpreter or the script.
             logging.error(
                 f"Error initializing server {self.name}: "
                 f"Permission denied for "
@@ -146,10 +167,6 @@ class Server:
             )
             await self.cleanup()
             raise
-        # except Exception as e:
-        #     logging.error(f"Error initializing server {self.name}: {e}")
-        #     await self.cleanup()
-        #     raise
 
     async def list_tools(self) -> List["Tool"]:
         """List available tools from the server.
@@ -167,7 +184,7 @@ class Server:
         tools: List["Tool"] = []
         logging.debug(
             f"Raw tools response from server: {tools_response}"
-        )  # Added debug log
+        )
 
         for item in tools_response:
             if isinstance(item, tuple) and item[0] == "tools":
@@ -180,16 +197,14 @@ class Server:
 
                 for tool_spec in tool_spec_list:
                     # Access attributes directly using dot notation
-                    # Use getattr for safety, providing None as default
                     tool_name = getattr(tool_spec, "name", None)
                     tool_desc = getattr(tool_spec, "description", None)
-                    # input_schema might be named differently,
-                    # so check common names
+                    # input_schema might be named differently
                     tool_schema = getattr(
                         tool_spec,
                         "input_schema",
                         getattr(tool_spec, "inputSchema", {}),
-                    )  # Try both common names
+                    )
 
                     if tool_name:  # Only add if we could get a name
                         tools.append(Tool(tool_name, tool_desc, tool_schema))
@@ -206,19 +221,17 @@ class Server:
         self,
         tool_name: Optional[str],
         arguments: Dict[str, Any],
-        retries: int = 1,
-        delay: float = 1.0,
-    ) -> Any:
+        tool_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Execute a tool with retry mechanism.
 
         Args:
             tool_name: The name of the tool to execute.
             arguments: The arguments to pass to the tool.
-            retries: The number of retries to attempt.
-            delay: The delay between retries in seconds.
+            tool_id: Optional unique ID for the tool call.
 
         Returns:
-            The result of the tool execution.
+            The result of the tool execution in a format suitable for the LLM.
 
         Raises:
             RuntimeError: If the server is not initialized or
@@ -227,63 +240,153 @@ class Server:
         if not self.session:
             raise RuntimeError(f"Server {self.name} not initialized")
 
+        # Generate a tool ID if not provided
+        if tool_id is None:
+            tool_id = str(uuid.uuid4())
+
         retryable_call_exceptions = (
-            # General async timeout
             asyncio.TimeoutError,
-            # Stdio pipe broke, server might have crashed
             BrokenPipeError,
-            # Stdio pipe reset
             ConnectionResetError,
-            # Stdio stream ended unexpectedly
             EOFError,
-            # --- Add MCP-specific exceptions
-            # (check mcp documentation!) ---
         )
 
-        attempt = 0
-        last_exception = None
-        while attempt < retries + 1:
+        logging.debug(f"Executing tool: {tool_name} with arguments: {arguments}")
+        try:
+            # Execute the tool
+            result = await self.session.call_tool(tool_name, arguments)
+            
+            # Process the result based on content types
+            response_content = []
+            
+            # Check if we have a proper CallToolResult with content
+            if hasattr(result, 'content') and isinstance(result.content, list):
+                for content_item in result.content:
+                    # Check content type
+                    if hasattr(content_item, 'type'):
+                        # Handle ImageContent
+                        if content_item.type == 'image' and hasattr(content_item, 'data'):
+                            image_data = base64.b64decode(content_item.data)
+                            response_content.append({"json": {"filename": "screenshot.jpeg"}})
+                            # Add image data
+                            response_content.append({
+                                "image": {
+                                    "format": "jpeg",
+                                    "data": base64.b64encode(image_data).decode('utf-8')
+                                }
+                            })
+                        
+                        # Handle TextContent
+                        elif content_item.type == 'text' and hasattr(content_item, 'text'):
+                            response_content.append({"json": {"text": content_item.text}})
+                        
+                        # Handle EmbeddedResource
+                        elif content_item.type == 'resource' and hasattr(content_item, 'resource'):
+                            resource = content_item.resource
+                            if hasattr(resource, 'uri'):
+                                response_content.append({"json": {"resource": resource.uri.unicode_string()}})
+                                self.artifact_uris.append(resource.uri)
+                                logging.info(f"Tracked artifact URI: {resource.uri}")
+                            if hasattr(resource, 'text'):
+                                response_content.append({"json": {"resource": resource.text}})
+            else:
+                # Fallback for simple results
+                response_content.append({"text": str(result)})
+                
+            # Get page info for context
             try:
-                logging.debug(
-                    f"Attempt {attempt + 1}: Executing {tool_name} "
-                    f"on server {self.name}..."
-                )
-                result = await self.session.call_tool(tool_name, arguments)
-                logging.debug(f"Tool {tool_name} executed successfully.")
-                if (
-                    isinstance(result, dict)
-                    and "progress" in result
-                    and "total" in result
-                ):
-                    progress = result["progress"]
-                    total = result["total"]
-                    percentage = (progress / total) * 100 if total else 0
-                    logging.debug("Progress:" f"{progress}/{total} ({percentage:.1f}%)")
-                return result
+                page_info_result = await self.session.call_tool("get_page_info", {})
+                page_info_text = "Page info not available"
+                
+                if hasattr(page_info_result, 'content') and isinstance(page_info_result.content, list):
+                    for content_item in page_info_result.content:
+                        if hasattr(content_item, 'type') and content_item.type == 'text' and hasattr(content_item, 'text'):
+                            page_info_text = content_item.text
+                            break
+                
+                response_content.append({"text": f"Current page: {page_info_text}"})
+            except Exception as e:
+                logging.warning(f"Error getting page info: {e}")
+            
+            return {
+                "toolResult": {
+                    "toolUseId": tool_id,
+                    "content": response_content
+                }
+            }
 
-            except retryable_call_exceptions as e:
-                last_exception = e
-                attempt += 1
-                logging.warning(
-                    f"Error during tool {tool_name} "
-                    f"execution on server {self.name} "
-                    f"(Attempt {attempt} of {retries + 1}): "
-                    f"{type(e).__name__}: {e}."
-                )
-                if attempt < retries + 1:
-                    logging.debug(f"Retrying in {delay} seconds...")
-                    await asyncio.sleep(delay)
+        except Exception as e:
+            error_msg = f"Error executing tool {tool_name}: {str(e)}"
+            logging.error(error_msg)
+            return {
+                "toolResult": {
+                    "toolUseId": tool_id,
+                    "content": [{"text": error_msg}]
+                }
+            }
+
+    async def download_artifacts(self, download_dir: str = "downloads") -> List[str]:
+        """Download all tracked artifacts.
+        
+        Args:
+            download_dir: The directory to save artifacts to.
+            
+        Returns:
+            A list of paths to the downloaded artifacts.
+        """
+        if not self.session:
+            raise RuntimeError(f"Server {self.name} not initialized")
+            
+        downloaded_paths = []
+        
+        if not self.artifact_uris:
+            logging.info("No artifacts to download")
+            return downloaded_paths
+            
+        logging.info(f"Downloading {len(self.artifact_uris)} artifacts...")
+        
+        # Create downloads directory if it doesn't exist
+        os.makedirs(download_dir, exist_ok=True)
+        
+        for uri in self.artifact_uris:
+            try:
+                # Extract filename from URI
+                filename = uri.path
+                if not filename:
+                    logging.warning(f"Failed to parse artifact URI: {uri}")
+                    continue
+                    
+                # Read the artifact using the resource
+                resource_contents = await self.session.read_resource(uri)
+                
+                if resource_contents:
+                    contents = resource_contents.contents
+                    for content in contents:
+                        if isinstance(content, TextResourceContents):
+                            text_content = content
+                            # The content might be JSON-encoded
+                            try:
+                                text = json.loads(text_content.text)[0]["text"]
+                            except (json.JSONDecodeError, IndexError, KeyError):
+                                text = text_content.text
+                                
+                            # Create a local directory for downloads
+                            artifact_dir = f"{download_dir}/{uri.host}"
+                            os.makedirs(artifact_dir, exist_ok=True)
+                            
+                            # Save the artifact
+                            download_path = f"{artifact_dir}{filename}"
+                            with open(download_path, 'w', encoding="utf-8") as f:
+                                f.write(text)
+                                
+                            downloaded_paths.append(download_path)
+                            logging.info(f"Downloaded artifact: {uri} to {download_path}")
                 else:
-                    logging.error(
-                        f"Max retries reached for tool {tool_name}. "
-                        "Failing. "
-                        f"Exception: {last_exception}"
-                    )
-                    raise RuntimeError(
-                        "Tool execution failed "
-                        f"after {retries + 1} attempts "
-                        f"for tool '{tool_name}'"
-                    ) from last_exception
+                    logging.warning(f"Failed to download artifact: {uri} - No content returned")
+            except Exception as e:
+                logging.error(f"Error downloading artifact {uri}: {str(e)}")
+                
+        return downloaded_paths
 
     async def cleanup(self) -> None:
         """Clean up server resources."""
@@ -347,8 +450,28 @@ class Tool:
             {arguments_section}
             """
 
+    def format_for_bedrock(self) -> Dict[str, Any]:
+        """Format tool for Bedrock-style tool configuration.
+        
+        Returns:
+            A dictionary with the tool specification.
+        """
+        return {
+            "toolSpec": {
+                "name": self.name,
+                "description": self.description,
+                "inputSchema": {
+                    "json": {
+                        "type": "object",
+                        "properties": self.input_schema.get("properties", {}),
+                        "required": self.input_schema.get("required", [])
+                    }
+                }
+            }
+        }
 
-# --- LLMClient Class (Cleaned) ---
+
+# --- LLMClient Class (Enhanced) ---
 class LLMClient:
     """Manages communication with the LLM provider."""
 
@@ -367,6 +490,7 @@ class LLMClient:
         self._chat_session: Optional[genai.ChatSession] = None
         self._generation_config: Optional[types.GenerateContentConfig] = None
         self._system_instruction: Optional[str] = None
+        self.total_tokens_used: int = 0  # Track token usage
 
     def _initialize_client(self) -> None:
         """Initializes the Gen AI client if not already done."""
@@ -378,8 +502,6 @@ class LLMClient:
             )
             self._client = genai.Client(
                 vertexai=False,
-                # project=self.project,
-                # location=self.location,
                 api_key=os.getenv("GOOGLE_API_KEY", default_api_error),
             )
             logging.info(
@@ -412,9 +534,20 @@ class LLMClient:
 
         self._chat_session = self._client.chats.create(model=self.model_name)
         self._chat_session.send_message(system_instruction)
-        logging.info(
-            "LLM chat session initialized."
-        )  # System instruction set is implied
+        self._system_instruction = system_instruction
+        logging.info("LLM chat session initialized.")
+
+    def estimate_token_count(self, text: str) -> int:
+        """Estimate the number of tokens in the text.
+        
+        Args:
+            text: The text to estimate tokens for.
+            
+        Returns:
+            Estimated token count.
+        """
+        # Simple estimation: ~4 characters per token for English text
+        return len(text) // 4
 
     @staticmethod
     def extract_tool_call_json(text: str) -> Optional[Dict[str, Any]]:
@@ -445,8 +578,6 @@ class LLMClient:
             )
         else:
             # Fallback: If no ```json block, maybe the entire text is the JSON?
-            # Be cautious with this, might parse unintended text.
-            # Let's only consider it if it looks like a JSON object.
             text_stripped = text.strip()
             if text_stripped.startswith("{") and text_stripped.endswith("}"):
                 json_string = text_stripped
@@ -456,10 +587,7 @@ class LLMClient:
                 )
 
         if not json_string:
-            # If after trying both, we have nothing, return None
-            # This also catches the case where the original
-            # text was empty or whitespace
-            if text.strip():  # Only log if there was actual text content
+            if text.strip():
                 logging.debug(
                     "Could not extract a JSON string from "
                     f"the LLM response: >>>{text}<<<"
@@ -522,12 +650,232 @@ class LLMClient:
             current_message  # Pass the whole history
         )
 
+        # Update token usage estimate
+        estimated_input_tokens = self.estimate_token_count(current_message)
+        estimated_output_tokens = self.estimate_token_count(response.text)
+        self.total_tokens_used += estimated_input_tokens + estimated_output_tokens
+        
         response_text = response.text
         logging.debug(f"Received raw LLM response: {response_text}")
         return response_text
+        
+    def recreate_session(self) -> None:
+        """Recreate the chat session with the same system instruction.
+        
+        This is useful after summarizing the conversation.
+        """
+        if not self._system_instruction:
+            logging.warning("Cannot recreate session: No system instruction set")
+            return
+            
+        self._initialize_client()
+        if not self._client:
+            raise ConnectionError("LLM Client not initialized.")
+            
+        self._chat_session = self._client.chats.create(model=self.model_name)
+        self._chat_session.send_message(self._system_instruction)
+        logging.info("LLM chat session recreated")
 
 
-# --- Chat Session (Orchestrates interaction - Cleaned) ---
+# --- ConversationManager Class ---
+class ConversationManager:
+    """Manages the conversation history and provides optimization functions."""
+    
+    def __init__(self, llm_client: LLMClient):
+        """Initialize the conversation manager.
+        
+        Args:
+            llm_client: The LLM client to use for summarization.
+        """
+        self.llm_client = llm_client
+        self.messages: List[Dict[str, Any]] = []
+        
+    def add_message(self, role: str, content: Union[str, List[Dict[str, Any]]]) -> None:
+        """Add a message to the conversation history.
+        
+        Args:
+            role: The role of the message sender (user/assistant/system).
+            content: The content of the message (string or structured content).
+        """
+        self.messages.append({"role": role, "content": content})
+        
+    def get_message_count(self) -> int:
+        """Get the number of messages in the conversation.
+        
+        Returns:
+            The number of messages.
+        """
+        return len(self.messages)
+        
+    def get_conversation_text(self) -> str:
+        """Get the full conversation as text.
+        
+        Returns:
+            The conversation text.
+        """
+        text = ""
+        for msg in self.messages:
+            role = msg["role"].upper()
+            content = msg["content"]
+            if isinstance(content, str):
+                text += f"{role}: {content}\n\n"
+            else:
+                # Handle structured content
+                text += f"{role}: [Structured content]\n\n"
+        return text
+        
+    def should_summarize(self) -> bool:
+        """Check if the conversation should be summarized.
+        
+        Returns:
+            True if the conversation should be summarized, False otherwise.
+        """
+        # Check token usage against threshold
+        return self.llm_client.total_tokens_used > SUMMARIZATION_TOKEN_THRESHOLD
+        
+    def summarize_conversation(self) -> None:
+        """Summarize the conversation to reduce token usage."""
+        if len(self.messages) <= KEEP_LAST_TURNS * 2 + 1:
+            # Not enough messages to summarize
+            logging.info("Not enough messages to summarize")
+            return
+            
+        # Keep the system message and last few turns
+        system_message = None
+        if self.messages[0]["role"] == "system":
+            system_message = self.messages[0]
+            
+        # Keep the last few turns
+        last_turns = self.messages[-KEEP_LAST_TURNS*2:]
+        
+        # Create summarization prompt
+        to_summarize = self.messages[1:-KEEP_LAST_TURNS*2] if system_message else self.messages[:-KEEP_LAST_TURNS*2]
+        
+        summarization_prompt = """Please summarize the following conversation while preserving key information, decisions, and context.
+Focus on what's been accomplished and important findings. Provide a concise summary:
+
+"""
+        for msg in to_summarize:
+            role = msg["role"].upper()
+            if isinstance(msg["content"], str):
+                content = msg["content"]
+                summarization_prompt += f"{role}: {content}\n\n"
+            else:
+                # Handle structured content
+                summarization_prompt += f"{role}: [Structured content]\n\n"
+            
+        # Get summary from LLM
+        try:
+            # Use a temporary chat session for summarization
+            temp_client = LLMClient(
+                model_name=self.llm_client.model_name,
+                project=self.llm_client.project,
+                location=self.llm_client.location
+            )
+            temp_client._initialize_client()
+            temp_session = temp_client._client.chats.create(model=self.llm_client.model_name)
+            summary_response = temp_session.send_message(summarization_prompt)
+            summary_text = summary_response.text
+            
+            # Create new conversation with summary
+            new_messages = []
+            if system_message:
+                new_messages.append(system_message)
+                
+            # Add summary as assistant message
+            new_messages.append({
+                "role": "assistant", 
+                "content": f"[CONVERSATION SUMMARY: {summary_text}]"
+            })
+            
+            # Add recent turns
+            new_messages.extend(last_turns)
+            
+            # Update messages
+            self.messages = new_messages
+            
+            # Reset the LLM client to start a fresh conversation
+            self.llm_client.recreate_session()
+            
+            # Reset token count estimate
+            self.llm_client.total_tokens_used = 0
+            for msg in self.messages:
+                if isinstance(msg["content"], str):
+                    self.llm_client.total_tokens_used += self.llm_client.estimate_token_count(msg["content"])
+                    
+            logging.info(f"Conversation summarized. New message count: {len(self.messages)}")
+        except Exception as e:
+            logging.error(f"Error summarizing conversation: {e}")
+            traceback.print_exc()
+    
+    def filter_empty_text_content(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Filter out empty text content from message.
+        
+        Args:
+            message: The message to filter.
+            
+        Returns:
+            Filtered message.
+        """
+        if not message or 'content' not in message:
+            return message
+        
+        if isinstance(message['content'], str):
+            return message
+            
+        filtered_content = []
+        for content_item in message.get('content', []):
+            # Keep items that don't have 'text' key or have non-empty text
+            if 'text' not in content_item or content_item['text'].strip():
+                filtered_content.append(content_item)
+        
+        # Create a new message with filtered content
+        filtered_message = message.copy()
+        filtered_message['content'] = filtered_content
+        return filtered_message
+        
+    def remove_media_except_last_turn(self) -> None:
+        """Remove images/documents from all messages except for the last turn."""
+        if len(self.messages) < 2:
+            return
+            
+        # Find the last user message index
+        last_user_index = None
+        for i in range(len(self.messages) - 1, -1, -1):
+            if self.messages[i]['role'] == 'user':
+                last_user_index = i
+                break
+                
+        if last_user_index is None:
+            return
+            
+        # Process all messages except the last turn
+        for i in range(last_user_index):
+            message = self.messages[i]
+            if 'content' not in message or isinstance(message['content'], str):
+                continue
+                
+            new_content = []
+            for content_item in message['content']:
+                # Keep text content
+                if 'text' in content_item:
+                    new_content.append(content_item)
+                # Remove images and other media
+                elif 'image' in content_item or 'json' in content_item:
+                    pass
+                else:
+                    new_content.append(content_item)
+                    
+            # If no content left, add a placeholder
+            if not new_content:
+                new_content.append({
+                    "text": "An image or document was removed for brevity."
+                })
+                
+            message['content'] = new_content
+
+
+# --- Chat Session (Orchestrates interaction - Enhanced) ---
 class ChatSession:
     """Orchestrates the interaction between user
     and Gemini tools via MCP server."""
@@ -543,15 +891,16 @@ class ChatSession:
         self.llm_client: LLMClient = llm_client
         # Store available tools once fetched
         self.available_tools: List[Tool] = []
-        # Store the conversation history
-        self.messages: List[Dict[str, Any]] = (
-            []
-        )  # Use Any for content type flexibility (str or dict)
+        # Use conversation manager
+        self.conversation = ConversationManager(llm_client)
         self.llm_model_name = llm_client.model_name
+        self.download_dir = "downloads"
+        
+        # Create directory for downloads
+        os.makedirs(self.download_dir, exist_ok=True)
 
     async def cleanup_servers(self) -> None:
         """Clean up the Gemini server properly."""
-        # Adjusted to only clean the single gemini_server
         if self.gemini_server:
             logging.info(f"Cleaning up server: {self.gemini_server.name}")
             await self.gemini_server.cleanup()
@@ -575,72 +924,20 @@ class ChatSession:
                     f"No tools found on server {self.gemini_server.name}. "
                     "Interaction will be limited."
                 )
-                # Decide if you want to proceed without tools or exit
-                # return False # Example: Exit if no tools
             else:
                 logging.info(
                     "Available tools: "
                     f"{[tool.name for tool in self.available_tools]}"
                 )
 
-            # 3. Format tool descriptions for the system prompt
+            # 3. Set system instruction (using the SYSTEM_PROMPT constant)
+            # Add tools description
             tools_description = "\n".join(
                 [tool.format_for_llm() for tool in self.available_tools]
             )
+            system_instruction = SYSTEM_PROMPT + "\n\nAvailable tools:\n" + tools_description
 
-            # 4. Define System Instruction
-            introduction = (
-                "You are a helpful assistant with access to these tools:\n\n"
-                f"{tools_description}\n"
-                "Choose the appropriate tool based on "
-                "the complexity of user's question. "
-                "If no tool is needed, reply directly.\n\n"
-            )
-            tool_format_instruction = (
-                "IMPORTANT: When you need to use a tool, "
-                "you must ONLY respond with "
-                "the exact format below, nothing else:\n"
-                "{\n"
-                '    "tool": "tool-name",\n'
-                '    "arguments": {\n'
-                '        "argument-name": "value"\n'
-                "    }\n"
-                "}\n\n"
-            )
-            post_tool_processing = (
-                "After receiving a tool's response:\n"
-                "1. Transform the raw data into a natural, "
-                "conversational response\n"
-                "2. Keep responses concise but informative\n"
-                "3. Focus on the most relevant information\n"
-                "4. Use appropriate context from the user's question\n"
-                "5. Avoid simply repeating the raw data\n\n"
-            )
-            translate_llm_instruction = (
-                "6. When the tool is `translate_llm`, "
-                "it requires the following arguments: "
-                "`{'text': 'the text to translate', 'source_language': "
-                "'source language code (e.g., en, fr)', 'target_language': "
-                "'target language code (e.g., fr, en)'}`.\n\n"
-            )
-            tool_response_prefix = (
-                "7. When you used a tool always respond by "
-                "starting 'As per tool-name': \n\n"
-            )
-            final_constraint = (
-                "Please use only the tools that are explicitly defined above."
-            )
-
-            system_instruction_content = (
-                introduction
-                + tool_format_instruction
-                + post_tool_processing
-                + translate_llm_instruction
-                + tool_response_prefix
-                + final_constraint
-            )
-
-            # 5. Define Generation Configuration
+            # 4. Configure LLM Client with Gemini-specific generation config
             generate_content_config = types.GenerateContentConfig(
                 temperature=0.9,
                 top_p=0.8,
@@ -664,24 +961,12 @@ class ChatSession:
                 ],
             )
 
-            # 6. Configure LLM Client
+            # 5. Configure LLM Client
             self.llm_client.set_generation_config(generate_content_config)
-            self.llm_client.set_system_instruction(system_instruction_content)
+            self.llm_client.set_system_instruction(system_instruction)
 
-            # 7. Initialize message history
-            # (Optional: Add system prompt if API
-            # doesn't handle it separately)
-            # Some APIs treat the system instruction
-            # separately, others expect it in the message list.
-            # Since we called set_system_instruction
-            # which initializes the chat,
-            # we start with an empty message history
-            # here for the user/assistant turns.
-            # self.messages = []
-            # Example if system instruction needs to be first message:
-            self.messages = [
-                {"role": "system", "content": system_instruction_content}
-            ]  # Adjust role if needed ('system'/'user'/'context')
+            # 6. Initialize message history with system instruction
+            self.conversation.add_message("system", system_instruction)
 
             logging.info("LLM client and system prompt prepared successfully.")
             return True
@@ -696,50 +981,120 @@ class ChatSession:
             logging.error(f"Initialization failed: {e}")
             return False
 
-    async def _run_tool_and_get_result(
-        self, tool_name: Optional[str], arguments: Dict[str, Any]
-    ) -> str:
-        """Finds the correct server and executes the tool.
-
+    async def process_tool_requests(self, tool_calls: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Process all tool calls in a response.
+        
         Args:
-            tool_name: The name of the tool to execute.
-            arguments: The arguments to pass to the tool.
-
+            tool_calls: List of tool call requests.
+            
         Returns:
-            The result of the tool execution or an error message.
+            A consolidated result with all tool results.
         """
-        # Simplified: Assumes the single gemini_server has the tool if listed
-        tool_exists = any(tool.name == tool_name for tool in self.available_tools)
-
-        if not tool_exists:
-            error_msg = (
-                f"Error: Tool '{tool_name}' is not "
-                "listed as available on the server."
-            )
-            logging.error(error_msg)
-            return error_msg  # Return error message for LLM
-
-        logging.info(f"Executing tool: {tool_name} " f"with arguments: {arguments}")
+        consolidated_result = {
+            "role": "user",
+            "content": []
+        }
+        
+        for tool_call in tool_calls:
+            tool_name = tool_call.get("tool")
+            tool_id = tool_call.get("toolUseId", str(uuid.uuid4()))
+            arguments = tool_call.get("arguments", {})
+            
+            # Execute the tool
+            result = await self.gemini_server.execute_tool(tool_name, arguments, tool_id)
+            
+            # Add the result to the consolidated result
+            if "toolResult" in result and "content" in result["toolResult"]:
+                consolidated_result["content"].extend(result["toolResult"]["content"])
+        
+        # Get page info for additional context
         try:
-            # Use the gemini_server instance directly
-            result = await self.gemini_server.execute_tool(tool_name, arguments)
+            page_info = await self.gemini_server.execute_tool("get_page_info", {})
+            if "toolResult" in page_info and "content" in page_info["toolResult"]:
+                consolidated_result["content"].extend(page_info["toolResult"]["content"])
+        except Exception as e:
+            logging.warning(f"Error getting page info: {e}")
+            
+        return consolidated_result
 
-            # Format the result for the LLM.
-            # Simple string conversion for now.
-            # Could be JSON stringified if the result is complex.
-            if isinstance(result, (dict, list)):
-                result_str = json.dumps(result)
+    async def execute_task(self, task_description: str) -> None:
+        """Execute a complex task using the web automation tools.
+        
+        Args:
+            task_description: The description of the task to execute.
+        """
+        # Add the task to conversation
+        self.conversation.add_message("user", task_description)
+        
+        # Initial request to model
+        llm_raw_response = self.llm_client.get_response(task_description)
+        
+        # Check if it's a tool call
+        parsed_tool_call = self.llm_client.extract_tool_call_json(llm_raw_response)
+        
+        if not parsed_tool_call:
+            # Not a tool call, just a regular response
+            self.conversation.add_message("assistant", llm_raw_response)
+            print(f"\nAssistant: {llm_raw_response} - Response by Default Model: {self.llm_model_name}")
+            return
+            
+        # It's a tool call - enter the tool execution loop
+        self.conversation.add_message("assistant", llm_raw_response)
+        print(f"\nAssistant: {llm_raw_response} - MCP Client Model: {self.llm_model_name}")
+        
+        # Task automation loop
+        stop_reason = "tool_use"  # Assume we need to use tools initially
+        nb_request = 1
+        
+        while stop_reason == "tool_use":
+            nb_request += 1
+            
+            # Extract tool calls
+            tool_calls = []
+            tool_call = {
+                "tool": parsed_tool_call.get("tool"),
+                "arguments": parsed_tool_call.get("arguments", {}),
+                "toolUseId": str(uuid.uuid4())
+            }
+            tool_calls.append(tool_call)
+            
+            print(f"\nExecuting tool: {tool_call['tool']}")
+            print(f"Tool arguments: {json.dumps(tool_call['arguments'], indent=2)}")
+            
+            # Execute all tools
+            tool_results = await self.process_tool_requests(tool_calls)
+            
+            # Add tool results to conversation
+            self.conversation.add_message("user", tool_results["content"])
+            
+            # Check if conversation needs summarization
+            if self.conversation.should_summarize():
+                logging.info("Summarizing conversation...")
+                self.conversation.summarize_conversation()
+                
+            # Remove media from old messages to reduce token usage
+            self.conversation.remove_media_except_last_turn()
+            
+            # Get next response from model
+            print(f"Sending request {nb_request} to model...")
+            
+            # Create a simple text prompt for the next request
+            next_prompt = "Continue with the task. What's the next step?"
+            llm_raw_response = self.llm_client.get_response(next_prompt)
+            
+            # Parse next tool call
+            parsed_tool_call = self.llm_client.extract_tool_call_json(llm_raw_response)
+            
+            # Add response to conversation
+            self.conversation.add_message("assistant", llm_raw_response)
+            print(f"\nAssistant: {llm_raw_response}")
+            
+            # Check if we should continue with tool execution
+            if parsed_tool_call:
+                stop_reason = "tool_use"
             else:
-                result_str = str(result)
-            logging.info(
-                f"Tool '{tool_name}' execution " f"successful. Result: {result_str}"
-            )
-            return result_str  # Return result string for LLM
-
-        except RuntimeError as e:
-            error_msg = f"Error executing tool '{tool_name}': {str(e)}"
-            logging.error(error_msg)
-            return error_msg  # Return error message for LLM
+                stop_reason = "content_stopped"
+                print("\nTask completed or awaiting further instructions.")
 
     async def start(self) -> None:
         """Main chat session handler."""
@@ -760,78 +1115,42 @@ class ChatSession:
                 if not user_input:
                     continue
 
-                # 1. Add user message to history
-                # Use the role the API expects, usually 'user'
-                self.messages.append({"role": "user", "content": user_input})
-
-                # 2. Get LLM response (potential tool call or direct answer)
-                llm_raw_response = self.llm_client.get_response(user_input)
-
-                # 3. Attempt to parse the response as a tool call
-                parsed_tool_call = self.llm_client.extract_tool_call_json(
-                    llm_raw_response
-                )
-
-                # 4. Check if it's a tool call
-                if parsed_tool_call:
-                    # It's a tool call
-                    tool_name = parsed_tool_call.get("tool")
-                    arguments = parsed_tool_call.get("arguments", {})
-
-                    # Optional: Add the LLM's tool
-                    # call decision to history
-                    # The exact format/role depends
-                    # on the API (e.g., 'assistant'/'model'/'tool_call')
-                    # Using 'assistant' role for the raw
-                    # response containing the call
-                    self.messages.append(
-                        {"role": "assistant", "content": llm_raw_response}
-                    )
-
-                    # 5. Execute the tool
-                    tool_result_content = await self._run_tool_and_get_result(
-                        tool_name, arguments
-                    )
-
-                    # 6. Add tool result to history
-                    content_text = (
-                        "Tool execution result "
-                        f"for {tool_name}: {tool_result_content}"
-                    )
-                    self.messages.append(
-                        {
-                            "role": "user",
-                            "content": content_text,
-                        }
-                    )  # Providing context
-
-                    # 7. Get the LLM's final response
-                    # summarizing the tool result
-                    logging.debug("Asking LLM to process tool result...")
-                    final_response = self.llm_client.get_response(tool_result_content)
-
-                    # 8. Add final assistant response to history
-                    self.messages.append(
-                        {"role": "assistant", "content": final_response}
-                    )
-                    print(
-                        f"\nAssistant: {final_response} - "
-                        f"MCP Client Model: {self.llm_model_name}"
-                    )
-
+                # Regular chat vs. task execution
+                if "search" in user_input.lower() or any(tool_keyword in user_input.lower() for tool_keyword in ["navigate", "browse", "screenshot", "click"]):
+                    # This is likely a task requiring tools, use the task execution mode
+                    await self.execute_task(user_input)
                 else:
-                    # It's a direct answer (not a tool call)
-                    # Add assistant's direct response to history
-                    self.messages.append(
-                        {"role": "assistant", "content": llm_raw_response}
-                    )
-                    print(
-                        f"\nAssistant: {llm_raw_response} - "
-                        f"Response by Default Model: {self.llm_model_name}"
-                    )
+                    # Regular chat without task automation
+                    # Add user message to history
+                    self.conversation.add_message("user", user_input)
 
-                # Optional: Trim history to prevent exceeding token limits
-                # e.g., keep only the last N messages
+                    # Check if conversation needs summarization
+                    if self.conversation.should_summarize():
+                        logging.info("Summarizing conversation...")
+                        self.conversation.summarize_conversation()
+
+                    # Get LLM response
+                    llm_raw_response = self.llm_client.get_response(user_input)
+                    parsed_tool_call = self.llm_client.extract_tool_call_json(llm_raw_response)
+
+                    if parsed_tool_call:
+                        # It's a tool call
+                        tool_name = parsed_tool_call.get("tool")
+                        arguments = parsed_tool_call.get("arguments", {})
+
+                        # Add assistant's response to history
+                        self.conversation.add_message("assistant", llm_raw_response)
+                        print(f"\nAssistant: {llm_raw_response} - MCP Client Model: {self.llm_model_name}")
+
+                        # Ask if the user wants to execute the tool
+                        execute = input("\nExecute this tool? (y/n): ").strip().lower()
+                        if execute == 'y':
+                            # Switch to task execution mode
+                            await self.execute_task(user_input)
+                    else:
+                        # Regular response
+                        self.conversation.add_message("assistant", llm_raw_response)
+                        print(f"\nAssistant: {llm_raw_response} - Response by Default Model: {self.llm_model_name}")
 
             except KeyboardInterrupt:
                 logging.info("\nExiting...")
@@ -844,10 +1163,19 @@ class ChatSession:
                     "Please try again later."
                 )
                 break  # Exit loop on connection errors
-                # Optional: Clear last user message from history if needed?
-                # if self.messages and self.messages[-1]["role"] == "user":
-                #     self.messages.pop()
 
+        # Try to download any artifacts before cleanup
+        try:
+            if self.gemini_server.artifact_uris:
+                print(f"\nDownloading {len(self.gemini_server.artifact_uris)} artifacts...")
+                downloaded_paths = await self.gemini_server.download_artifacts(self.download_dir)
+                if downloaded_paths:
+                    print(f"Downloaded {len(downloaded_paths)} artifacts to {self.download_dir}:")
+                    for path in downloaded_paths:
+                        print(f"  - {path}")
+        except Exception as e:
+            logging.error(f"Error downloading artifacts: {e}")
+            
         # Cleanup after the loop finishes
         await self.cleanup_servers()
 
@@ -870,7 +1198,6 @@ async def main() -> None:
         return
 
     # Extract LLM specific config (adjust keys as needed in your config)
-    # Example: Get project/location from env vars or config file
     llm_project = os.getenv("GOOGLE_CLOUD_PROJECT", "")
     llm_location = os.getenv(
         "GOOGLE_CLOUD_LOCATION", "us-central1"
@@ -888,7 +1215,6 @@ async def main() -> None:
         sys.exit(1)
 
     # --- Initialize Components ---
-
     gemini_server = Server(
         gemini_server_config_data.get("name", "gemini_llm_server"),
         gemini_server_config_data["config"],
