@@ -876,7 +876,7 @@ async def main() -> None:
         "GOOGLE_CLOUD_LOCATION", "us-central1"
     )  # Default if not set
     llm_model = os.getenv(
-        "LLM_MODEL_NAME", "gemma-3-27b-it"
+        "LLM_MODEL_NAME", "gemini-2.0-flash"
     )  # Default model, more flexible
 
     if not llm_project or not llm_location:
