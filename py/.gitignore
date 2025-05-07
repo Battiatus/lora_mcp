@@ -1,2 +1,7 @@
 .env
 .venv
+
+videos/
+downloads/
+artefacts
+screenshot
