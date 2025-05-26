@@ -1,0 +1,1013 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MCP Server API",
+    "description": "\n    API REST pour le serveur MCP (Model Context Protocol) avec automatisation web via Playwright.\n    \n    ## Fonctionnalités principales\n    \n    * 🌐 **Navigation web** - Navigation automatisée avec anti-détection\n    * 📸 **Captures d'écran** - Capture de pages web\n    * 🖱️ **Interactions** - Clic, saisie de texte, défilement\n    * 🎬 **Téléchargement vidéo** - Support YouTube, TikTok, etc.\n    * 🔍 **Extraction de données** - Sélecteurs CSS, JavaScript\n    * 🤖 **Résolution CAPTCHA** - Détection et résolution automatique\n    * 🌍 **Traduction** - Via Google Translate API\n    \n    ## Authentification\n    \n    Utiliser un token Bearer dans l'en-tête Authorization.\n    \n    ## Sessions\n    \n    La plupart des opérations nécessitent une session active. Créer une session avec `/sessions` avant d'utiliser les outils.\n    ",
+    "termsOfService": "https://example.com/terms/",
+    "contact": { "name": "MCP Server Support", "email": "support@example.com" },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Root",
+        "description": "Point de terminaison racine",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health Check",
+        "description": "Vérification de l'état de santé du service",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Create Session",
+        "description": "Crée une nouvelle session de navigation.\n\nUne session est nécessaire pour utiliser la plupart des outils.\nLa session maintient l'état du navigateur entre les appels.",
+        "operationId": "create_session_sessions_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionResponse" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/sessions/{session_id}": {
+      "get": {
+        "tags": ["Sessions"],
+        "summary": "Get Session",
+        "description": "Récupère les informations d'une session",
+        "operationId": "get_session_sessions__session_id__get",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Session Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Sessions"],
+        "summary": "Close Session",
+        "description": "Ferme une session et libère les ressources",
+        "operationId": "close_session_sessions__session_id__delete",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Session Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/navigate": {
+      "post": {
+        "tags": ["Navigation"],
+        "summary": "Navigate",
+        "description": "Navigue vers une URL spécifiée.\n\nSupporte la détection et résolution automatique de CAPTCHA.\nPour TikTok, utilise automatiquement des techniques anti-détection avancées.",
+        "operationId": "navigate_tools_navigate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NavigateRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/screenshot": {
+      "post": {
+        "tags": ["Navigation"],
+        "summary": "Take Screenshot",
+        "description": "Prend une capture d'écran de la page actuelle.\n\nRetourne l'image en base64.",
+        "operationId": "take_screenshot_tools_screenshot_post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "title": "Session Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ScreenshotResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/click": {
+      "post": {
+        "tags": ["Interaction"],
+        "summary": "Click",
+        "description": "Clique aux coordonnées spécifiées.\n\nSimule un mouvement de souris naturel avant le clic.",
+        "operationId": "click_tools_click_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ClickRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/type": {
+      "post": {
+        "tags": ["Interaction"],
+        "summary": "Type Text",
+        "description": "Tape du texte dans l'élément actuellement focalisé.\n\nSimule une vitesse de frappe humaine avec des variations.",
+        "operationId": "type_text_tools_type_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TypeRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/scroll": {
+      "post": {
+        "tags": ["Interaction"],
+        "summary": "Scroll",
+        "description": "Fait défiler la page dans la direction spécifiée",
+        "operationId": "scroll_tools_scroll_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ScrollRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/element/find": {
+      "post": {
+        "tags": ["Elements"],
+        "summary": "Find Element",
+        "description": "Trouve un élément sur la page en utilisant un sélecteur CSS.\n\nRetourne les informations sur l'élément incluant sa position et son contenu.",
+        "operationId": "find_element_tools_element_find_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElementSelectorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/element/click": {
+      "post": {
+        "tags": ["Elements"],
+        "summary": "Click Element",
+        "description": "Clique sur un élément identifié par un sélecteur CSS",
+        "operationId": "click_element_tools_element_click_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElementSelectorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/element/type": {
+      "post": {
+        "tags": ["Elements"],
+        "summary": "Type In Element",
+        "description": "Tape du texte dans un élément spécifique",
+        "operationId": "type_in_element_tools_element_type_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TypeInElementRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/element/extract-text": {
+      "post": {
+        "tags": ["Elements"],
+        "summary": "Extract Text",
+        "description": "Extrait le texte de tous les éléments correspondant au sélecteur CSS.\n\nUtile pour scraper du contenu de pages web.",
+        "operationId": "extract_text_tools_element_extract_text_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElementSelectorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/javascript": {
+      "post": {
+        "tags": ["Advanced"],
+        "summary": "Execute Javascript",
+        "description": "Exécute du code JavaScript dans le contexte du navigateur.\n\n⚠️ Utiliser avec précaution - peut modifier l'état de la page.",
+        "operationId": "execute_javascript_tools_javascript_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JavaScriptRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/video/find": {
+      "post": {
+        "tags": ["Video"],
+        "summary": "Find Videos",
+        "description": "Trouve toutes les vidéos présentes sur la page actuelle.\n\nDétecte les vidéos HTML5, iframes YouTube/Vimeo, et autres formats.",
+        "operationId": "find_videos_tools_video_find_post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "title": "Session Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/video/download": {
+      "post": {
+        "tags": ["Video"],
+        "summary": "Download Video",
+        "description": "Télécharge une vidéo depuis une URL.\n\nSupporte YouTube, TikTok, Vimeo, et autres plateformes via yt-dlp.",
+        "operationId": "download_video_tools_video_download_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VideoDownloadRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/captcha/detect": {
+      "post": {
+        "tags": ["CAPTCHA"],
+        "summary": "Detect Captcha",
+        "description": "Détecte et tente de résoudre automatiquement les CAPTCHA.\n\nSupporte reCAPTCHA, hCaptcha, et les puzzles coulissants (TikTok).",
+        "operationId": "detect_captcha_tools_captcha_detect_post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "title": "Session Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools/translate": {
+      "post": {
+        "tags": ["Translation"],
+        "summary": "Translate",
+        "description": "Traduit du texte entre différentes langues.\n\nUtilise Google Cloud Translation API.",
+        "operationId": "translate_tools_translate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TranslateRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/tools/file/write": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Write File",
+        "description": "Écrit du contenu dans un fichier.\n\nLes fichiers sont stockés dans le contexte de la session.",
+        "operationId": "write_file_tools_file_write_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WriteFileRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ToolResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "HTTPBearer": [] }]
+      }
+    },
+    "/artifacts/{session_id}/{filename}": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "Download Artifact",
+        "description": "Télécharge un fichier artifact généré",
+        "operationId": "download_artifact_artifacts__session_id___filename__get",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Session Id" }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Filename" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ClickRequest": {
+        "properties": {
+          "x": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "X",
+            "description": "Coordonnée X du clic"
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Y",
+            "description": "Coordonnée Y du clic"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "ID de session requis"
+          }
+        },
+        "type": "object",
+        "required": ["x", "y", "session_id"],
+        "title": "ClickRequest",
+        "description": "Paramètres pour cliquer à des coordonnées spécifiques",
+        "example": { "session_id": "session-123", "x": 100, "y": 200 }
+      },
+      "ElementSelectorRequest": {
+        "properties": {
+          "selector": {
+            "type": "string",
+            "title": "Selector",
+            "description": "Sélecteur CSS de l'élément",
+            "example": "button.submit"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "ID de session requis"
+          }
+        },
+        "type": "object",
+        "required": ["selector", "session_id"],
+        "title": "ElementSelectorRequest",
+        "description": "Paramètres pour interagir avec un élément via sélecteur CSS"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": { "$ref": "#/components/schemas/ValidationError" },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "JavaScriptRequest": {
+        "properties": {
+          "script": {
+            "type": "string",
+            "title": "Script",
+            "description": "Code JavaScript à exécuter"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "ID de session requis"
+          }
+        },
+        "type": "object",
+        "required": ["script", "session_id"],
+        "title": "JavaScriptRequest",
+        "description": "Paramètres pour exécuter du JavaScript"
+      },
+      "NavigateRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url",
+            "description": "URL vers laquelle naviguer",
+            "example": "https://example.com"
+          },
+          "session_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Session Id",
+            "description": "ID de session pour réutiliser un contexte"
+          }
+        },
+        "type": "object",
+        "required": ["url"],
+        "title": "NavigateRequest",
+        "description": "Paramètres pour naviguer vers une URL",
+        "example": {
+          "session_id": "optional-session-id",
+          "url": "https://www.example.com"
+        }
+      },
+      "ScreenshotResponse": {
+        "properties": {
+          "success": { "type": "boolean", "title": "Success" },
+          "session_id": { "type": "string", "title": "Session Id" },
+          "filename": { "type": "string", "title": "Filename" },
+          "image_base64": { "type": "string", "title": "Image Base64" },
+          "format": { "type": "string", "title": "Format", "default": "jpeg" }
+        },
+        "type": "object",
+        "required": ["success", "session_id", "filename", "image_base64"],
+        "title": "ScreenshotResponse",
+        "description": "Réponse pour une capture d'écran"
+      },
+      "ScrollRequest": {
+        "properties": {
+          "direction": {
+            "type": "string",
+            "pattern": "^(up|down)$",
+            "title": "Direction",
+            "description": "Direction du défilement"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Amount",
+            "description": "Quantité de défilement en pixels"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "ID de session requis"
+          }
+        },
+        "type": "object",
+        "required": ["direction", "amount", "session_id"],
+        "title": "ScrollRequest",
+        "description": "Paramètres pour faire défiler la page"
+      },
+      "SessionResponse": {
+        "properties": {
+          "session_id": { "type": "string", "title": "Session Id" },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "status": { "type": "string", "title": "Status", "default": "active" }
+        },
+        "type": "object",
+        "required": ["session_id", "created_at"],
+        "title": "SessionResponse",
+        "description": "Réponse contenant les informations de session"
+      },
+      "ToolResponse": {
+        "properties": {
+          "success": { "type": "boolean", "title": "Success" },
+          "session_id": { "type": "string", "title": "Session Id" },
+          "result": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": ["success", "session_id", "result"],
+        "title": "ToolResponse",
+        "description": "Réponse générique pour les outils"
+      },
+      "TranslateRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Texte à traduire"
+          },
+          "source_language": {
+            "type": "string",
+            "title": "Source Language",
+            "description": "Code de langue source",
+            "example": "en"
+          },
+          "target_language": {
+            "type": "string",
+            "title": "Target Language",
+            "description": "Code de langue cible",
+            "example": "fr"
+          }
+        },
+        "type": "object",
+        "required": ["text", "source_language", "target_language"],
+        "title": "TranslateRequest",
+        "description": "Paramètres pour traduire du texte"
+      },
+      "TypeInElementRequest": {
+        "properties": {
+          "selector": {
+            "type": "string",
+            "title": "Selector",
+            "description": "Sélecteur CSS de l'élément"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Texte à saisir"
+          },
+          "submit": {
+            "type": "boolean",
+            "title": "Submit",
+            "description": "Appuyer sur Entrée après la saisie",
+            "default": false
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "ID de session requis"
+          }
+        },
+        "type": "object",
+        "required": ["selector", "text", "session_id"],
+        "title": "TypeInElementRequest",
+        "description": "Paramètres pour taper dans un élément spécifique"
+      },
+      "TypeRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Texte à saisir"
+          },
+          "submit": {
+            "type": "boolean",
+            "title": "Submit",
+            "description": "Appuyer sur Entrée après la saisie",
+            "default": false
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "ID de session requis"
+          }
+        },
+        "type": "object",
+        "required": ["text", "session_id"],
+        "title": "TypeRequest",
+        "description": "Paramètres pour taper du texte"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": { "type": "string", "title": "Message" },
+          "type": { "type": "string", "title": "Error Type" }
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      },
+      "VideoDownloadRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url",
+            "description": "URL de la vidéo à télécharger"
+          },
+          "filename": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Filename",
+            "description": "Nom de fichier personnalisé"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "ID de session requis"
+          }
+        },
+        "type": "object",
+        "required": ["url", "session_id"],
+        "title": "VideoDownloadRequest",
+        "description": "Paramètres pour télécharger une vidéo"
+      },
+      "WriteFileRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Nom du fichier à créer"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Contenu du fichier"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "ID de session requis"
+          }
+        },
+        "type": "object",
+        "required": ["filename", "content", "session_id"],
+        "title": "WriteFileRequest",
+        "description": "Paramètres pour écrire un fichier"
+      }
+    },
+    "securitySchemes": { "HTTPBearer": { "type": "http", "scheme": "bearer" } }
+  }
+}
