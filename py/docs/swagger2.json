@@ -1,0 +1,171 @@
+{
+    "info": {
+        "name": "MCP Web Automation API",
+        "description": "Collection complète pour tester l'API MCP",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{api_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8000/api/v1"
+        },
+        {
+            "key": "api_token",
+            "value": "your-api-token"
+        },
+        {
+            "key": "session_id",
+            "value": ""
+        }
+    ],
+    "item": [
+        {
+            "name": "Navigation",
+            "item": [
+                {
+                    "name": "Navigate to URL",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has session_id\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.session_id).to.exist;",
+                                    "    pm.environment.set(\"session_id\", jsonData.session_id);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"url\": \"https://example.com\",\n    \"wait_for\": \"networkidle\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/navigate",
+                            "host": ["{{base_url}}"],
+                            "path": ["navigate"]
+                        }
+                    }
+                },
+                {
+                    "name": "Take Screenshot",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"session_id\": \"{{session_id}}\",\n    \"full_page\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/screenshot",
+                            "host": ["{{base_url}}"],
+                            "path": ["screenshot"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Interaction",
+            "item": [
+                {
+                    "name": "Click Element",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"selector\": \"button.submit\",\n    \"session_id\": \"{{session_id}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/click_element",
+                            "host": ["{{base_url}}"],
+                            "path": ["click_element"]
+                        }
+                    }
+                },
+                {
+                    "name": "Type Text",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"text\": \"Hello from Postman!\",\n    \"submit\": false,\n    \"session_id\": \"{{session_id}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/type",
+                            "host": ["{{base_url}}"],
+                            "path": ["type"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Video Download",
+            "item": [
+                {
+                    "name": "Download TikTok Video",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"url\": \"https://www.tiktok.com/@username/video/12345\",\n    \"filename\": \"tiktok_test.mp4\",\n    \"session_id\": \"{{session_id}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/download_video",
+                            "host": ["{{base_url}}"],
+                            "path": ["download_video"]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}
