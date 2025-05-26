@@ -1,0 +1,443 @@
+<!-- docs/index.html -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Web Automation API - Documentation</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">MCP Web Automation API</h1>
+            <p class="text-gray-600">Documentation complète pour l'API d'automatisation web</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Sidebar -->
+            <nav class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Navigation</h2>
+                <ul class="space-y-2">
+                    <li><a href="#introduction" class="text-blue-600 hover:underline">Introduction</a></li>
+                    <li><a href="#authentication" class="text-blue-600 hover:underline">Authentification</a></li>
+                    <li><a href="#quickstart" class="text-blue-600 hover:underline">Démarrage rapide</a></li>
+                    <li><a href="#endpoints" class="text-blue-600 hover:underline">Points d'accès</a></li>
+                    <li><a href="#examples" class="text-blue-600 hover:underline">Exemples</a></li>
+                    <li><a href="#errors" class="text-blue-600 hover:underline">Gestion des erreurs</a></li>
+                </ul>
+            </nav>
+
+            <!-- Main content -->
+            <main class="md:col-span-2 space-y-8">
+                <!-- Introduction -->
+                <section id="introduction" class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold mb-4">Introduction</h2>
+                    <p class="text-gray-700 mb-4">
+                        L'API MCP Web Automation permet d'automatiser des tâches web complexes avec des capacités avancées
+                        d'anti-détection et de résolution de CAPTCHA.
+                    </p>
+                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                        <p class="text-blue-700">
+                            <strong>Base URL:</strong> <code>https://mcp-server.example.com/api/v1</code>
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Authentication -->
+                <section id="authentication" class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold mb-4">Authentification</h2>
+                    <p class="text-gray-700 mb-4">
+                        L'API utilise l'authentification Bearer Token. Incluez votre token dans l'en-tête Authorization:
+                    </p>
+                    <pre><code class="language-bash">Authorization: Bearer YOUR_API_TOKEN</code></pre>
+                </section>
+
+                <!-- Quick Start -->
+                <section id="quickstart" class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold mb-4">Démarrage rapide</h2>
+                    <h3 class="text-xl font-semibold mb-2">1. Naviguer vers une page</h3>
+                    <pre><code class="language-python">import requests
+
+response = requests.post(
+    "https://mcp-server.example.com/api/v1/navigate",
+    headers={"Authorization": "Bearer YOUR_TOKEN"},
+    json={"url": "https://example.com"}
+)
+
+print(response.json())</code></pre>
+
+                    <h3 class="text-xl font-semibold mb-2 mt-4">2. Prendre une capture d'écran</h3>
+                    <pre><code class="language-python">response = requests.post(
+    "https://mcp-server.example.com/api/v1/screenshot",
+    headers={"Authorization": "Bearer YOUR_TOKEN"},
+    json={"session_id": "YOUR_SESSION_ID"}
+)</code></pre>
+                </section>
+
+                <!-- Endpoints -->
+                <section id="endpoints" class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold mb-4">Points d'accès principaux</h2>
+                    
+                    <div class="space-y-4">
+                        <!-- Navigate -->
+                        <div class="border-l-4 border-green-400 pl-4">
+                            <h3 class="font-semibold">POST /navigate</h3>
+                            <p class="text-gray-600">Navigue vers une URL spécifiée</p>
+                            <details class="mt-2">
+                                <summary class="cursor-pointer text-blue-600">Voir les paramètres</summary>
+                                <div class="mt-2 bg-gray-50 p-4 rounded">
+                                    <pre><code class="language-json">{
+    "url": "https://example.com",
+    "wait_for": "networkidle",
+    "session_id": "optional"
+}</code></pre>
+                                </div>
+                            </details>
+                        </div>
+
+                        <!-- Screenshot -->
+                        <div class="border-l-4 border-blue-400 pl-4">
+                            <h3 class="font-semibold">POST /screenshot</h3>
+                            <p class="text-gray-600">Prend une capture d'écran</p>
+                            <details class="mt-2">
+                                <summary class="cursor-pointer text-blue-600">Voir les paramètres</summary>
+                                <div class="mt-2 bg-gray-50 p-4 rounded">
+                                    <pre><code class="language-json">{
+    "session_id": "optional",
+    "full_page": false
+}</code></pre>
+                                </div>
+                            </details>
+                        </div>
+
+                        <!-- Click -->
+                        <div class="border-l-4 border-yellow-400 pl-4">
+                            <h3 class="font-semibold">POST /click</h3>
+                            <p class="text-gray-600">Clique à des coordonnées spécifiques</p>
+                            <details class="mt-2">
+                                <summary class="cursor-pointer text-blue-600">Voir les paramètres</summary>
+                                <div class="mt-2 bg-gray-50 p-4 rounded">
+                                    <pre><code class="language-json">{
+    "x": 100,
+    "y": 200,
+    "session_id": "optional"
+}</code></pre>
+                                </div>
+                            </details>
+                        </div>
+
+                        <!-- Download Video -->
+                        <div class="border-l-4 border-purple-400 pl-4">
+                            <h3 class="font-semibold">POST /download_video</h3>
+                            <p class="text-gray-600">Télécharge une vidéo depuis une URL</p>
+                            <details class="mt-2">
+                                <summary class="cursor-pointer text-blue-600">Voir les paramètres</summary>
+                                <div class="mt-2 bg-gray-50 p-4 rounded">
+                                    <pre><code class="language-json">{
+    "url": "https://www.tiktok.com/@user/video/123",
+    "filename": "my_video.mp4",
+    "session_id": "optional"
+}</code>
+</div>
+                           </details>
+                       </div>
+                   </div>
+               </section>
+
+               <!-- Examples -->
+               <section id="examples" class="bg-white rounded-lg shadow-lg p-6">
+                   <h2 class="text-2xl font-semibold mb-4">Exemples complets</h2>
+                   
+                   <h3 class="text-xl font-semibold mb-2">Exemple 1: Automatisation complète</h3>
+                   <pre><code class="language-python">import requests
+import time
+
+# Configuration
+API_URL = "https://mcp-server.example.com/api/v1"
+TOKEN = "YOUR_API_TOKEN"
+headers = {"Authorization": f"Bearer {TOKEN}"}
+
+# 1. Créer une session et naviguer
+response = requests.post(f"{API_URL}/navigate", 
+   headers=headers,
+   json={"url": "https://example.com"}
+)
+session_id = response.json()["session_id"]
+
+# 2. Attendre le chargement
+time.sleep(2)
+
+# 3. Cliquer sur un bouton
+response = requests.post(f"{API_URL}/click_element",
+   headers=headers,
+   json={
+       "selector": "button.submit",
+       "session_id": session_id
+   }
+)
+
+# 4. Remplir un formulaire
+response = requests.post(f"{API_URL}/type_in_element",
+   headers=headers,
+   json={
+       "selector": "input[name='email']",
+       "text": "test@example.com",
+       "session_id": session_id
+   }
+)
+
+# 5. Prendre une capture d'écran
+response = requests.post(f"{API_URL}/screenshot",
+   headers=headers,
+   json={"session_id": session_id}
+)
+
+print(f"Screenshot URL: {response.json()['data']['url']}")
+
+# 6. Fermer la session
+requests.delete(f"{API_URL}/sessions/{session_id}", headers=headers)</code></pre>
+
+                   <h3 class="text-xl font-semibold mb-2 mt-6">Exemple 2: Téléchargement de vidéo TikTok</h3>
+                   <pre><code class="language-python">import requests
+import asyncio
+
+async def download_tiktok_video(video_url):
+   # Démarrer le téléchargement
+   response = requests.post(f"{API_URL}/download_video",
+       headers=headers,
+       json={
+           "url": video_url,
+           "filename": "tiktok_video.mp4"
+       }
+   )
+   
+   session_id = response.json()["session_id"]
+   
+   # Vérifier le statut du téléchargement
+   while True:
+       status = requests.get(
+           f"{API_URL}/sessions/{session_id}",
+           headers=headers
+       ).json()
+       
+       if status.get("download_complete"):
+           print(f"Vidéo téléchargée: {status['download_path']}")
+           break
+           
+       await asyncio.sleep(5)
+
+# Utilisation
+asyncio.run(download_tiktok_video("https://www.tiktok.com/@user/video/123"))</code></pre>
+
+                   <h3 class="text-xl font-semibold mb-2 mt-6">Exemple 3: Extraction de données</h3>
+                   <pre><code class="language-javascript">// Utilisation avec JavaScript/Node.js
+const axios = require('axios');
+
+const API_URL = 'https://mcp-server.example.com/api/v1';
+const headers = { Authorization: 'Bearer YOUR_TOKEN' };
+
+async function extractProductData(productUrl) {
+   // Naviguer vers la page produit
+   const navResponse = await axios.post(`${API_URL}/navigate`, 
+       { url: productUrl },
+       { headers }
+   );
+   
+   const sessionId = navResponse.data.session_id;
+   
+   // Extraire les données
+   const titleResponse = await axios.post(`${API_URL}/extract_text`, 
+       { 
+           selector: 'h1.product-title',
+           session_id: sessionId 
+       },
+       { headers }
+   );
+   
+   const priceResponse = await axios.post(`${API_URL}/extract_text`,
+       { 
+           selector: '.price',
+           session_id: sessionId 
+       },
+       { headers }
+   );
+   
+   // Prendre une capture du produit
+   const screenshotResponse = await axios.post(`${API_URL}/screenshot`,
+       { session_id: sessionId },
+       { headers }
+   );
+   
+   return {
+       title: titleResponse.data.data.elements[0].text,
+       price: priceResponse.data.data.elements[0].text,
+       screenshot: screenshotResponse.data.data.url
+   };
+}
+
+// Utilisation
+extractProductData('https://example.com/product/123')
+   .then(data => console.log(data))
+   .catch(err => console.error(err));</code></pre>
+               </section>
+
+               <!-- Error Handling -->
+               <section id="errors" class="bg-white rounded-lg shadow-lg p-6">
+                   <h2 class="text-2xl font-semibold mb-4">Gestion des erreurs</h2>
+                   
+                   <h3 class="text-xl font-semibold mb-2">Codes d'erreur HTTP</h3>
+                   <table class="w-full border-collapse">
+                       <thead>
+                           <tr class="bg-gray-100">
+                               <th class="border p-2 text-left">Code</th>
+                               <th class="border p-2 text-left">Description</th>
+                           </tr>
+                       </thead>
+                       <tbody>
+                           <tr>
+                               <td class="border p-2"><code>400</code></td>
+                               <td class="border p-2">Requête invalide - Vérifiez les paramètres</td>
+                           </tr>
+                           <tr>
+                               <td class="border p-2"><code>401</code></td>
+                               <td class="border p-2">Non authentifié - Token manquant ou invalide</td>
+                           </tr>
+                           <tr>
+                               <td class="border p-2"><code>403</code></td>
+                               <td class="border p-2">Interdit - Permissions insuffisantes</td>
+                           </tr>
+                           <tr>
+                               <td class="border p-2"><code>404</code></td>
+                               <td class="border p-2">Non trouvé - Session ou ressource inexistante</td>
+                           </tr>
+                           <tr>
+                               <td class="border p-2"><code>429</code></td>
+                               <td class="border p-2">Trop de requêtes - Limite de taux atteinte</td>
+                           </tr>
+                           <tr>
+                               <td class="border p-2"><code>500</code></td>
+                               <td class="border p-2">Erreur serveur - Contactez le support</td>
+                           </tr>
+                       </tbody>
+                   </table>
+
+                   <h3 class="text-xl font-semibold mb-2 mt-4">Format des erreurs</h3>
+                   <pre><code class="language-json">{
+   "success": false,
+   "session_id": "550e8400-e29b-41d4-a716-446655440000",
+   "error": "Description détaillée de l'erreur",
+   "error_code": "SPECIFIC_ERROR_CODE",
+   "details": {
+       // Informations supplémentaires si disponibles
+   }
+}</code></pre>
+
+                   <h3 class="text-xl font-semibold mb-2 mt-4">Gestion des CAPTCHA</h3>
+                   <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                       <p class="text-yellow-700">
+                           L'API tente automatiquement de résoudre les CAPTCHA. Si la résolution échoue,
+                           l'erreur contiendra le type de CAPTCHA détecté :
+                       </p>
+                       <pre class="mt-2"><code class="language-json">{
+   "error": "CAPTCHA detected and could not be solved",
+   "error_code": "CAPTCHA_UNSOLVED",
+   "details": {
+       "captcha_type": "recaptcha_v2",
+       "page_url": "https://example.com/protected"
+   }
+}</code></pre>
+                   </div>
+               </section>
+
+               <!-- Rate Limits -->
+               <section class="bg-white rounded-lg shadow-lg p-6">
+                   <h2 class="text-2xl font-semibold mb-4">Limites de taux</h2>
+                   <table class="w-full border-collapse">
+                       <thead>
+                           <tr class="bg-gray-100">
+                               <th class="border p-2 text-left">Endpoint</th>
+                               <th class="border p-2 text-left">Limite</th>
+                               <th class="border p-2 text-left">Fenêtre</th>
+                           </tr>
+                       </thead>
+                       <tbody>
+                           <tr>
+                               <td class="border p-2">Navigation</td>
+                               <td class="border p-2">60 requêtes</td>
+                               <td class="border p-2">1 heure</td>
+                           </tr>
+                           <tr>
+                               <td class="border p-2">Screenshot</td>
+                               <td class="border p-2">100 requêtes</td>
+                               <td class="border p-2">1 heure</td>
+                           </tr>
+                           <tr>
+                               <td class="border p-2">Video Download</td>
+                               <td class="border p-2">10 requêtes</td>
+                               <td class="border p-2">1 heure</td>
+                           </tr>
+                           <tr>
+                               <td class="border p-2">Autres</td>
+                               <td class="border p-2">300 requêtes</td>
+                               <td class="border p-2">1 heure</td>
+                           </tr>
+                       </tbody>
+                   </table>
+               </section>
+
+               <!-- WebSocket -->
+               <section class="bg-white rounded-lg shadow-lg p-6">
+                   <h2 class="text-2xl font-semibold mb-4">WebSocket pour sessions temps réel</h2>
+                   <p class="text-gray-700 mb-4">
+                       Pour des interactions en temps réel, utilisez la connexion WebSocket :
+                   </p>
+                   <pre><code class="language-javascript">const ws = new WebSocket('wss://mcp-server.example.com/ws/session');
+
+ws.onopen = () => {
+   // Authentification
+   ws.send(JSON.stringify({
+       type: 'auth',
+       token: 'YOUR_API_TOKEN'
+   }));
+};
+
+ws.onmessage = (event) => {
+   const data = JSON.parse(event.data);
+   console.log('Received:', data);
+};
+
+// Envoyer des commandes
+ws.send(JSON.stringify({
+   type: 'navigate',
+   url: 'https://example.com'
+}));
+
+ws.send(JSON.stringify({
+   type: 'click',
+   x: 100,
+   y: 200
+}));</code></pre>
+               </section>
+           </main>
+       </div>
+
+       <!-- Footer -->
+       <footer class="mt-12 text-center text-gray-600">
+           <p>&copy; 2024 MCP Web Automation API. Version 1.0.0</p>
+           <p class="mt-2">
+               <a href="/docs" class="text-blue-600 hover:underline">Swagger UI</a> |
+               <a href="/redoc" class="text-blue-600 hover:underline">ReDoc</a> |
+               <a href="https://github.com/your-repo" class="text-blue-600 hover:underline">GitHub</a>
+           </p>
+       </footer>
+   </div>
+
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+</body>
+</html>
