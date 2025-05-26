@@ -5,3 +5,8 @@ videos/
 downloads/
 artefacts
 screenshot
+
+*.venv
+__pycache__/
+
+*/.venv
