@@ -14,6 +14,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
 from cryptography.fernet import Fernet
 
+from dotenv import load_dotenv
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 # Initialize Firebase
