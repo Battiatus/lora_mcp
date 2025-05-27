@@ -22,6 +22,7 @@ def initialize_firebase():
     try:
         # Try to get credentials from environment variable
         cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
+        print(f"Using Firebase credentials from: {cred_path}")
         if cred_path and os.path.exists(cred_path):
             cred = credentials.Certificate(cred_path)
         else:
