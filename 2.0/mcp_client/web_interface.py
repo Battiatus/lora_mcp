@@ -15,21 +15,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
 # Import your existing HTTP MCP client
 from main import ChatSession, HTTPServer, LLMClient, Configuration
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Pydantic models
-class ChatMessage(BaseModel):
-    message: str
-    session_id: Optional[str] = None
-
-class TaskMessage(BaseModel):
-    task_description: str
-    session_id: Optional[str] = None
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -140,7 +135,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         })
 
 async def handle_chat_message(session_id: str, message: str, chat_session: ChatSession):
-    """Handle a chat message"""
+    """Handle a chat message - Use the original logic from your client"""
     try:
         # Send typing indicator
         await manager.send_message(session_id, {
@@ -148,42 +143,69 @@ async def handle_chat_message(session_id: str, message: str, chat_session: ChatS
             "message": "Assistant is thinking..."
         })
         
-        # Add user message to conversation
-        chat_session.conversation.add_message("user", message)
-        
-        # Get LLM response
-        llm_response = chat_session.llm_client.get_response(message)
-        parsed_tool_call = chat_session.llm_client.extract_tool_call_json(llm_response)
-        
-        if parsed_tool_call:
-            # Tool call detected
-            await manager.send_message(session_id, {
-                "type": "assistant_tool_call",
-                "message": llm_response,
-                "tool_name": parsed_tool_call.get("tool"),
-                "tool_args": parsed_tool_call.get("arguments", {})
-            })
-            
-            # Execute the tool
-            await execute_tool_with_feedback(session_id, parsed_tool_call, chat_session)
-            
+        # Check if this looks like a task requiring tools
+        if any(keyword in message.lower() for keyword in ["search", "navigate", "browse", "screenshot", "click", "research", "analyze", "find", "download"]):
+            # Use task execution mode for complex requests
+            await handle_task_execution(session_id, message, chat_session)
         else:
-            # Regular response
-            chat_session.conversation.add_message("assistant", llm_response)
-            await manager.send_message(session_id, {
-                "type": "assistant_message",
-                "message": llm_response
-            })
+            # Regular chat mode
+            # Add user message to conversation
+            chat_session.conversation.add_message("user", message)
+            
+            # Check if conversation needs summarization
+            if chat_session.conversation.should_summarize():
+                await manager.send_message(session_id, {
+                    "type": "system_message",
+                    "message": "Optimizing conversation memory..."
+                })
+                chat_session.conversation.summarize_conversation()
+            
+            # Get LLM response
+            llm_response = chat_session.llm_client.get_response(message)
+            parsed_tool_call = chat_session.llm_client.extract_tool_call_json(llm_response)
+            
+            if parsed_tool_call:
+                # Tool call detected - execute automatically
+                chat_session.conversation.add_message("assistant", llm_response)
+                
+                await manager.send_message(session_id, {
+                    "type": "assistant_tool_call",
+                    "message": llm_response,
+                    "tool_name": parsed_tool_call.get("tool"),
+                    "tool_args": parsed_tool_call.get("arguments", {})
+                })
+                
+                # Execute the tool
+                await execute_tool_with_feedback(session_id, parsed_tool_call, chat_session)
+                
+                # Get follow-up response
+                next_prompt = "Continue with the task. What's the next step?"
+                follow_up_response = chat_session.llm_client.get_response(next_prompt)
+                
+                chat_session.conversation.add_message("assistant", follow_up_response)
+                await manager.send_message(session_id, {
+                    "type": "assistant_message",
+                    "message": follow_up_response
+                })
+                
+            else:
+                # Regular response
+                chat_session.conversation.add_message("assistant", llm_response)
+                await manager.send_message(session_id, {
+                    "type": "assistant_message",
+                    "message": llm_response
+                })
             
     except Exception as e:
         logger.error(f"Error handling chat message: {e}")
+        traceback.print_exc()
         await manager.send_message(session_id, {
             "type": "error",
             "message": f"Error processing message: {str(e)}"
         })
 
 async def handle_task_execution(session_id: str, task_description: str, chat_session: ChatSession):
-    """Handle complex task execution"""
+    """Handle complex task execution - Use the original execute_task logic"""
     try:
         await manager.send_message(session_id, {
             "type": "task_started",
@@ -198,6 +220,8 @@ async def handle_task_execution(session_id: str, task_description: str, chat_ses
         parsed_tool_call = chat_session.llm_client.extract_tool_call_json(llm_response)
         
         if not parsed_tool_call:
+            # Not a tool call, just a regular response
+            chat_session.conversation.add_message("assistant", llm_response)
             await manager.send_message(session_id, {
                 "type": "task_completed",
                 "message": llm_response,
@@ -205,13 +229,20 @@ async def handle_task_execution(session_id: str, task_description: str, chat_ses
             })
             return
         
+        # It's a tool call - enter the tool execution loop
         chat_session.conversation.add_message("assistant", llm_response)
         
-        # Task execution loop
+        await manager.send_message(session_id, {
+            "type": "assistant_message",
+            "message": llm_response
+        })
+        
+        # Task automation loop (same as original)
+        stop_reason = "tool_use"
         step_count = 0
         max_steps = 20
         
-        while parsed_tool_call and step_count < max_steps:
+        while stop_reason == "tool_use" and step_count < max_steps:
             step_count += 1
             
             await manager.send_message(session_id, {
@@ -222,8 +253,18 @@ async def handle_task_execution(session_id: str, task_description: str, chat_ses
                 "message": f"Step {step_count}: Executing {parsed_tool_call.get('tool')}"
             })
             
-            # Execute tool
-            tool_result = await execute_tool_with_feedback(session_id, parsed_tool_call, chat_session)
+            # Execute the tool
+            tool_calls = [{
+                "tool": parsed_tool_call.get("tool"),
+                "arguments": parsed_tool_call.get("arguments", {}),
+                "toolUseId": str(uuid.uuid4())
+            }]
+            
+            # Process tool requests (same as original logic)
+            tool_results = await process_tool_requests(tool_calls, chat_session)
+            
+            # Add tool results to conversation
+            chat_session.conversation.add_message("user", tool_results["content"])
             
             # Check if conversation needs summarization
             if chat_session.conversation.should_summarize():
@@ -233,17 +274,32 @@ async def handle_task_execution(session_id: str, task_description: str, chat_ses
                 })
                 chat_session.conversation.summarize_conversation()
             
-            # Get next step
+            # Remove media from old messages to reduce token usage
+            chat_session.conversation.remove_media_except_last_turn()
+            
+            # Get next response from model
             next_prompt = "Continue with the task. What's the next step?"
             llm_response = chat_session.llm_client.get_response(next_prompt)
+            
+            # Parse next tool call
             parsed_tool_call = chat_session.llm_client.extract_tool_call_json(llm_response)
             
+            # Add response to conversation
             chat_session.conversation.add_message("assistant", llm_response)
             
-            if not parsed_tool_call:
+            await manager.send_message(session_id, {
+                "type": "assistant_message",
+                "message": llm_response
+            })
+            
+            # Check if we should continue with tool execution
+            if parsed_tool_call:
+                stop_reason = "tool_use"
+            else:
+                stop_reason = "content_stopped"
                 await manager.send_message(session_id, {
                     "type": "task_completed",
-                    "message": llm_response,
+                    "message": "Task completed successfully!",
                     "steps": step_count
                 })
                 break
@@ -257,10 +313,32 @@ async def handle_task_execution(session_id: str, task_description: str, chat_ses
             
     except Exception as e:
         logger.error(f"Error handling task execution: {e}")
+        traceback.print_exc()
         await manager.send_message(session_id, {
             "type": "error",
             "message": f"Error executing task: {str(e)}"
         })
+
+async def process_tool_requests(tool_calls, chat_session: ChatSession):
+    """Process all tool calls in a response - Same as original logic"""
+    consolidated_result = {
+        "role": "user",
+        "content": []
+    }
+    
+    for tool_call in tool_calls:
+        tool_name = tool_call.get("tool")
+        tool_id = tool_call.get("toolUseId", str(uuid.uuid4()))
+        arguments = tool_call.get("arguments", {})
+        
+        # Execute the tool
+        result = await chat_session.gemini_server.execute_tool(tool_name, arguments, tool_id)
+        
+        # Add the result to the consolidated result
+        if "toolResult" in result and "content" in result["toolResult"]:
+            consolidated_result["content"].extend(result["toolResult"]["content"])
+    
+    return consolidated_result
 
 async def execute_tool_with_feedback(session_id: str, tool_call: Dict[str, Any], chat_session: ChatSession):
     """Execute a tool and provide real-time feedback"""
