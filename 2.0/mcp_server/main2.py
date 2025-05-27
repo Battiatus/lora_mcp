@@ -12,8 +12,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 import uvicorn
+
+from pydantic import BaseModel, EmailStr, Field
+from typing import Dict, Any, Optional
+
 
 # Import security components
 from security.auth import (
@@ -58,6 +61,30 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     role: Optional[str] = UserRole.USER
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr = Field(..., description="Email de l'utilisateur")
+    password: str = Field(..., min_length=6, description="Mot de passe utilisateur")
+    role: Optional[str] = Field("user", description="Rôle (admin, user, readonly, guest)")
+
+class AuthRequest(BaseModel):
+    id_token: str = Field(..., description="ID Token Firebase de l'utilisateur")
+
+class AuthResponse(BaseModel):
+    access_token: str = Field(..., description="JWT d'accès")
+    refresh_token: str = Field(..., description="JWT de rafraîchissement")
+    user: Dict[str, Any] = Field(..., description="Données utilisateur")
+
+class ToolRequest(BaseModel):
+    tool_name: str = Field(..., description="Nom de l'outil")
+    arguments: Dict[str, Any] = Field(..., description="Arguments d'appel de l'outil")
+    session_id: Optional[str] = Field(None, description="ID de session")
+
+class ToolResponse(BaseModel):
+    success: bool = Field(..., description="Indique le succès")
+    result: Any = Field(None, description="Résultat de l'opération")
+    error: Optional[str] = Field(None, description="Message d'erreur éventuel")
 
 # Import existing components
 try:
@@ -284,8 +311,9 @@ app = FastAPI(
 
 # Add security middleware
 app.middleware("http")(rate_limit_middleware)
-app.add_middleware(SecurityMiddleware)
-app.add_middleware(InputValidationMiddleware)
+app.middleware("http")(SecurityMiddleware())
+app.middleware("http")(InputValidationMiddleware())
+
 
 # Add CORS middleware (restrictive)
 app.add_middleware(
@@ -300,7 +328,17 @@ app.add_middleware(
 security_manager = SecurityManager()
 
 # Authentication endpoints
-@app.post("/auth/register", response_model=AuthResponse)
+@app.post(
+    "/auth/register",
+    response_model=AuthResponse,
+    summary="Créer un nouvel utilisateur",
+    description="Inscription d'un utilisateur avec gestion du rôle et génération des tokens.",
+    tags=["Auth"],
+    responses={
+        200: {"description": "Utilisateur créé"},
+        400: {"description": "Erreur de validation ou inscription"}
+    }
+)
 async def register(request: RegisterRequest):
     """Register a new user"""
     try:
@@ -323,7 +361,17 @@ async def register(request: RegisterRequest):
         logger.error(f"Registration error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/auth/login", response_model=AuthResponse)
+@app.post(
+    "/auth/login",
+    response_model=AuthResponse,
+    summary="Authentification utilisateur",
+    description="Connexion via ID token Firebase, génération des tokens JWT pour les accès sécurisés.",
+    tags=["Auth"],
+    responses={
+        200: {"description": "Connexion réussie"},
+        401: {"description": "Échec de l'authentification"}
+    }
+)
 async def login(request: AuthRequest):
     """Authenticate user with Firebase ID token"""
     try:
@@ -348,7 +396,13 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "secure-mcp-server", "version": "2.0.0"}
 
-@app.get("/tools")
+@app.get(
+    "/tools",
+    summary="Lister les outils disponibles",
+    description="Retourne la liste des outils accessibles à l'utilisateur connecté.",
+    tags=["Tools"],
+    responses={200: {"description": "Liste retournée"}}
+)
 async def list_tools(current_user: Dict[str, Any] = Depends(get_current_user)):
     """List available tools based on user permissions"""
     user_permissions = current_user.get("permissions", [])
@@ -470,7 +524,16 @@ async def cleanup_session(
         raise HTTPException(status_code=500, detail=str(e))
 
 # Admin endpoints
-@app.get("/admin/users")
+@app.get(
+    "/admin/users",
+    summary="Lister tous les utilisateurs",
+    description="Accessible uniquement par un administrateur.",
+    tags=["Admin"],
+    responses={
+        200: {"description": "Liste des utilisateurs"},
+        403: {"description": "Accès interdit"}
+    }
+)
 @require_role(UserRole.ADMIN)
 async def list_users(current_user: Dict[str, Any] = Depends(get_current_user)):
     """List all users (admin only)"""
@@ -490,7 +553,16 @@ async def list_users(current_user: Dict[str, Any] = Depends(get_current_user)):
         logger.error(f"Error listing users: {e}")
         raise HTTPException(status_code=500, detail="Failed to list users")
 
-@app.get("/admin/audit-logs")
+@app.get(
+    "/admin/audit-logs",
+    summary="Afficher les logs d'audit",
+    description="Consultation des logs d'audit (nécessite la permission VIEW_LOGS).",
+    tags=["Admin"],
+    responses={
+        200: {"description": "Logs d'audit retournés"},
+        403: {"description": "Permission refusée"}
+    }
+)
 @require_permission(Permission.VIEW_LOGS)
 async def get_audit_logs(
     limit: int = 100,
