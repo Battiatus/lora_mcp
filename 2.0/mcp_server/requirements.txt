@@ -13,7 +13,10 @@ pytesseract
 yt-dlp
 pytest-playwright
 requests
-firebase-admin
 PyJWT
 cryptography
 email-validator
+grpcio
+google-cloud-core
+google-cloud-firestore
+firebase-admin
