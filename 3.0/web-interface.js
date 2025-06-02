@@ -8,7 +8,7 @@ const winston = require('winston');
 const dotenv = require('dotenv');
 
 // Import the MCP client components
-const { HTTPServer, LLMClient, ChatSession } = require('./client');
+const { Configuration, HTTPServer, LLMClient, ChatSession } = require('./client');
 
 // Load environment variables
 dotenv.config();
@@ -232,7 +232,7 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
     
     // Initial LLM response
     const llmResponse = await chatSession.llmClient.getResponse(taskDescription);
-    const parsedToolCall = LLMClient.extractToolCallJson(llmResponse);
+    let parsedToolCall = LLMClient.extractToolCallJson(llmResponse);
     
     if (!parsedToolCall) {
       // Not a tool call, just a regular response
