@@ -2,10 +2,9 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
-const { GoogleAuth } = require('google-auth-library');
-const { DiscussServiceClient } = require('@google-ai/generativelanguage');
-const readline = require('readline');
 const dotenv = require('dotenv');
+const readline = require('readline');
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 
 // Load environment variables
 dotenv.config();
@@ -70,7 +69,7 @@ When you need to use a tool, you must ONLY respond with the exact format below, 
 
 class Configuration {
   static loadEnv() {
-    // Load environment variables using dotenv (already done above)
+    // Load environment variables using dotenv
     return process.env;
   }
 }
@@ -354,74 +353,107 @@ class LLMClient {
     this.modelName = modelName;
     this.projectId = projectId;
     this.location = location;
-    this.client = null;
-    this.chatSession = null;
+    this.genAI = null;
+    this.model = null;
     this.generationConfig = null;
     this.systemInstruction = null;
+    this.chatSession = null;
     this.totalTokensUsed = 0;
   }
 
   _initializeClient() {
-    if (!this.client) {
+    if (!this.genAI) {
       try {
-        // Try Vertex AI first, then fall back to API key
-        if (this.projectId && this.location) {
-          // Using Google Auth client for authentication
-          const auth = new GoogleAuth({
-            scopes: 'https://www.googleapis.com/auth/cloud-platform'
-          });
-
-          this.client = new DiscussServiceClient({
-            projectId: this.projectId,
-            location: this.location,
-            auth: auth
-          });
-
-          console.log(`Vertex AI client initialized for project '${this.projectId}' in '${this.location}'.`);
-        } else {
-          // Fall back to API key
-          const apiKey = process.env.GOOGLE_API_KEY;
-          
-          if (!apiKey) {
-            throw new Error('Neither Vertex AI authentication nor GOOGLE_API_KEY environment variable is available. Please set up authentication.');
-          }
-
-          this.client = new DiscussServiceClient({
-            apiKey: apiKey
-          });
-
-          console.log('Gen AI client initialized with API key.');
+        // Check for API key
+        const apiKey = process.env.GOOGLE_API_KEY;
+        
+        if (!apiKey) {
+          throw new Error('GOOGLE_API_KEY environment variable is not set. Please provide a valid API key.');
         }
+        
+        // Initialize the Google Generative AI client
+        this.genAI = new GoogleGenerativeAI(apiKey);
+        
+        // Get the model
+        this.model = this.genAI.getGenerativeModel({ model: this.modelName });
+        
+        console.log(`Google GenAI client initialized for model: ${this.modelName}`);
       } catch (error) {
-        console.error('Failed to initialize Vertex AI client:', error);
+        console.error('Failed to initialize Google GenAI client:', error);
         throw error;
       }
     }
   }
 
   setGenerationConfig(config) {
-    this.generationConfig = config;
-    console.debug(`Generation config set: ${JSON.stringify(config)}`);
+    // Convert from Vertex AI format to Google Generative AI format
+    this.generationConfig = {
+      temperature: config.temperature || 0.9,
+      topP: config.topP || 0.8,
+      topK: config.topK || 40,
+      maxOutputTokens: config.maxOutputTokens || 4048,
+    };
+    
+    // Safety settings conversion
+    this.safetySettings = config.safetySettings?.map(setting => {
+      const category = this._convertSafetyCategory(setting.category);
+      const threshold = this._convertSafetyThreshold(setting.threshold);
+      
+      return {
+        category,
+        threshold
+      };
+    }) || [];
+    
+    console.log(`Generation config set: ${JSON.stringify(this.generationConfig)}`);
+  }
+  
+  _convertSafetyCategory(category) {
+    const categoryMap = {
+      'HARM_CATEGORY_HATE_SPEECH': HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+      'HARM_CATEGORY_DANGEROUS_CONTENT': HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+      'HARM_CATEGORY_SEXUALLY_EXPLICIT': HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+      'HARM_CATEGORY_HARASSMENT': HarmCategory.HARM_CATEGORY_HARASSMENT
+    };
+    
+    return categoryMap[category] || HarmCategory.HARM_CATEGORY_UNSPECIFIED;
+  }
+  
+  _convertSafetyThreshold(threshold) {
+    const thresholdMap = {
+      'OFF': HarmBlockThreshold.BLOCK_NONE,
+      'LOW': HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      'MEDIUM': HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+      'HIGH': HarmBlockThreshold.BLOCK_LOW_AND_ABOVE
+    };
+    
+    return thresholdMap[threshold] || HarmBlockThreshold.BLOCK_NONE;
   }
 
-  setSystemInstruction(systemInstruction) {
+  async setSystemInstruction(systemInstruction) {
     this._initializeClient(); // Ensure client is ready
     
-    if (!this.client) {
+    if (!this.model) {
       throw new Error('LLM Client not initialized.');
     }
 
-    // Initialize chat session (implementation depends on the actual Google API)
-    // For this example, we'll store the system instruction and create a messages array
     this.systemInstruction = systemInstruction;
-    this.chatSession = {
-      messages: [
+    
+    // Initialize the chat session
+    this.chatSession = this.model.startChat({
+      history: [
         {
-          role: 'system',
-          content: systemInstruction
+          role: 'user',
+          parts: [{ text: systemInstruction }]
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'I understand my role as an advanced research assistant with web navigation and vision capabilities. I will follow the principles and methodologies you outlined. How can I assist you today?' }]
         }
-      ]
-    };
+      ],
+      generationConfig: this.generationConfig,
+      safetySettings: this.safetySettings
+    });
     
     console.log('LLM chat session initialized.');
   }
@@ -483,61 +515,23 @@ class LLMClient {
       throw new Error('LLM chat session is not initialized. Call setSystemInstruction first.');
     }
     
-    if (!this.client) { // Should be initialized if session exists
+    if (!this.model) { // Should be initialized if session exists
       throw new Error('LLM Client not initialized.');
     }
 
-    console.debug(`Sending messages to LLM: ${currentMessage}`);
+    console.debug(`Sending message to LLM: ${currentMessage}`);
     console.debug(`Using generation config: ${JSON.stringify(this.generationConfig)}`);
 
-    // Add user message to chat history
-    this.chatSession.messages.push({
-      role: 'user',
-      content: currentMessage
-    });
-
-    // Implement the actual call to the Google GenAI API
-    // This is a simplified example - actual implementation will depend on the API
     try {
-      // Mock LLM response for now
-      // In a real implementation, you would call the GenAI API here
-      // const response = await this.client.generateContent({
-      //   model: this.modelName,
-      //   contents: this.chatSession.messages,
-      //   generationConfig: this.generationConfig
-      // });
+      // Send message to the model
+      const result = await this.chatSession.sendMessage(currentMessage);
+      const responseText = result.response.text();
       
-      // For now, we'll simulate a response based on the input
-      let responseText = '';
-      
-      if (currentMessage.toLowerCase().includes('search') || 
-          currentMessage.toLowerCase().includes('navigate') ||
-          currentMessage.toLowerCase().includes('find')) {
-        // Simulate a tool call response
-        responseText = `\`\`\`json
-{
-  "tool": "navigate",
-  "arguments": {
-    "url": "https://www.example.com"
-  }
-}
-\`\`\``;
-      } else {
-        // Simulate a normal text response
-        responseText = `I'll help you with that. ${currentMessage.length > 10 ? 'Based on your request, I recommend...' : 'How can I assist you further?'}`;
-      }
-
       // Update token usage estimate
       const estimatedInputTokens = this.estimateTokenCount(currentMessage);
       const estimatedOutputTokens = this.estimateTokenCount(responseText);
       this.totalTokensUsed += estimatedInputTokens + estimatedOutputTokens;
       
-      // Add assistant response to chat history
-      this.chatSession.messages.push({
-        role: 'assistant',
-        content: responseText
-      });
-
       console.debug(`Received raw LLM response: ${responseText}`);
       return responseText;
     } catch (error) {
@@ -546,7 +540,7 @@ class LLMClient {
     }
   }
 
-  recreateSession() {
+  async recreateSession() {
     if (!this.systemInstruction) {
       console.warn('Cannot recreate session: No system instruction set');
       return;
@@ -554,18 +548,25 @@ class LLMClient {
     
     this._initializeClient();
     
-    if (!this.client) {
+    if (!this.model) {
       throw new Error('LLM Client not initialized.');
     }
     
-    this.chatSession = {
-      messages: [
+    // Recreate the chat session
+    this.chatSession = this.model.startChat({
+      history: [
         {
-          role: 'system',
-          content: this.systemInstruction
+          role: 'user',
+          parts: [{ text: this.systemInstruction }]
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'I understand my role as an advanced research assistant with web navigation and vision capabilities. I will follow the principles and methodologies you outlined. How can I assist you today?' }]
         }
-      ]
-    };
+      ],
+      generationConfig: this.generationConfig,
+      safetySettings: this.safetySettings
+    });
     
     console.log('LLM chat session recreated');
   }
@@ -649,27 +650,13 @@ Focus on what's been accomplished and important findings. Provide a concise summ
     
     // Get summary from LLM
     try {
-      // Use a temporary chat session for summarization
-      const tempClient = new LLMClient(
-        this.llmClient.modelName,
-        this.llmClient.projectId,
-        this.llmClient.location
-      );
-      
-      tempClient._initializeClient();
-      
-      // Create a temporary chat session
-      tempClient.chatSession = {
-        messages: [
-          {
-            role: 'user',
-            content: summarizationPrompt
-          }
-        ]
-      };
+      // Use a temporary genAI client for summarization
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+      const model = genAI.getGenerativeModel({ model: this.llmClient.modelName });
       
       // Get the summary
-      const summaryText = await tempClient.getResponse(summarizationPrompt);
+      const result = await model.generateContent(summarizationPrompt);
+      const summaryText = result.response.text();
       
       // Create new conversation with summary
       const newMessages = [];
@@ -680,7 +667,7 @@ Focus on what's been accomplished and important findings. Provide a concise summ
       
       // Add summary as assistant message
       newMessages.push({
-        role: 'assistant',
+        role: 'assistant', 
         content: `[CONVERSATION SUMMARY: ${summaryText}]`
       });
       
@@ -691,11 +678,10 @@ Focus on what's been accomplished and important findings. Provide a concise summ
       this.messages = newMessages;
       
       // Reset the LLM client to start a fresh conversation
-      this.llmClient.recreateSession();
+      await this.llmClient.recreateSession();
       
       // Reset token count estimate
       this.llmClient.totalTokensUsed = 0;
-      
       for (const msg of this.messages) {
         if (typeof msg.content === 'string') {
           this.llmClient.totalTokensUsed += this.llmClient.estimateTokenCount(msg.content);
@@ -837,7 +823,6 @@ class ChatSession {
       const systemInstruction = `${SYSTEM_PROMPT}\n\nAvailable tools:\n${toolsDescription}`;
 
       // 4. Configure LLM Client
-      // In a real implementation, you would configure the actual Google GenAI client here
       const generateContentConfig = {
         temperature: 0.9,
         topP: 0.8,
@@ -853,7 +838,7 @@ class ChatSession {
 
       // 5. Configure LLM Client
       this.llmClient.setGenerationConfig(generateContentConfig);
-      this.llmClient.setSystemInstruction(systemInstruction);
+      await this.llmClient.setSystemInstruction(systemInstruction);
 
       // 6. Initialize message history with system instruction
       this.conversation.addMessage('system', systemInstruction);
@@ -986,7 +971,7 @@ class ChatSession {
     });
 
     // Function to handle user input
-    const promptUser = async () => {
+    const promptUser = () => {
       rl.question('You: ', async (userInput) => {
         try {
           userInput = userInput.trim();
@@ -1007,6 +992,7 @@ class ChatSession {
                 userInput.toLowerCase().includes(keyword))) {
             // This is likely a task requiring tools, use the task execution mode
             await this.executeTask(userInput);
+            promptUser();
           } else {
             // Regular chat without task automation
             // Add user message to history
@@ -1099,7 +1085,7 @@ async function main() {
     // Extract LLM specific config
     const llmProject = env.GOOGLE_CLOUD_PROJECT || '';
     const llmLocation = env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-    const llmModel = env.LLM_MODEL_NAME || 'gemini-2.0-flash';
+    const llmModel = env.LLM_MODEL_NAME || 'gemini-1.5-pro';
 
     // Initialize Components
     const geminiServer = new HTTPServer(
