@@ -4,3 +4,4 @@ pydantic
 httpx
 google-cloud-logging
 google-cloud-aiplatform
+python-dotenv
