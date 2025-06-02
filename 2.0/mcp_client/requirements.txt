@@ -4,3 +4,8 @@ pydantic
 httpx
 google-cloud-logging
 google-cloud-aiplatform
+pdfkit
+markdown
+python-multipart
+python-jose[cryptography] 
+passlib[bcrypt]
