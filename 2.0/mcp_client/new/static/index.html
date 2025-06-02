@@ -3,19 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Advanced Assistant</title>
+    <title>MCP Advanced Client</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css">
+    <link rel="stylesheet" href="./style">
 </head>
 <body>
+    <!-- Login Modal -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-modal">
+            <div class="auth-header">
+                <div class="auth-logo">
+                    <i class="fas fa-robot"></i>
+                    <h2>MCP Client</h2>
+                </div>
+            </div>
+            <div class="auth-content">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="username">Nom d'utilisateur</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Mot de passe</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <div class="form-error" id="loginError"></div>
+                    <button type="submit" class="btn btn-primary">Se connecter</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
     <div class="app-container">
         <!-- Sidebar -->
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </div>
             <div class="sidebar-header">
                 <div class="logo">
                     <i class="fas fa-robot"></i>
-                    <span>MCP Assistant</span>
+                    <span>MCP Client</span>
                 </div>
                 <div class="status-indicator" id="connectionStatus">
                     <div class="status-dot"></div>
@@ -24,54 +55,72 @@
             </div>
             
             <div class="sidebar-content">
+                <div class="user-profile">
+                    <div class="avatar-container" id="avatarContainer">
+                        <img src="/static/default-avatar.png" alt="Avatar" id="userAvatar">
+                        <div class="avatar-edit" id="avatarEditBtn">
+                            <i class="fas fa-pencil-alt"></i>
+                        </div>
+                    </div>
+                    <div class="user-info">
+                        <div class="username" id="displayUsername">Utilisateur</div>
+                    </div>
+                </div>
+                
+                <div class="usage-stats">
+                    <div class="usage-title">Utilisation API</div>
+                    <div class="usage-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="usageProgressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="usage-text">
+                            <span id="usageCount">0</span>/<span id="usageLimit">100</span> actions
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="mode-selector">
                     <button class="mode-btn active" data-mode="chat">
                         <i class="fas fa-comments"></i>
-                        <span>Chat Mode</span>
+                        <span>Mode Discussion</span>
                     </button>
                     <button class="mode-btn" data-mode="task">
                         <i class="fas fa-tasks"></i>
-                        <span>Task Mode</span>
+                        <span>Mode Tâche</span>
                     </button>
                 </div>
                 
                 <div class="quick-actions">
-                    <h3>Quick Actions</h3>
+                    <h3>Actions rapides</h3>
                     <div class="action-grid">
                         <button class="action-btn" data-action="screenshot">
                             <i class="fas fa-camera"></i>
-                            <span>Screenshot</span>
+                            <span>Capture</span>
                         </button>
                         <button class="action-btn" data-action="navigate">
                             <i class="fas fa-globe"></i>
-                            <span>Navigate</span>
+                            <span>Naviguer</span>
                         </button>
                         <button class="action-btn" data-action="research">
                             <i class="fas fa-search"></i>
-                            <span>Research</span>
+                            <span>Rechercher</span>
                         </button>
                         <button class="action-btn" data-action="analyze">
                             <i class="fas fa-chart-line"></i>
-                            <span>Analyze</span>
+                            <span>Analyser</span>
                         </button>
                     </div>
                 </div>
                 
-                <div class="examples-section">
-                    <h3>Example Commands</h3>
-                    <div class="examples-list">
-                        <div class="example-item" data-example="Research the latest AI trends and create a comprehensive report">
-                            <i class="fas fa-brain"></i>
-                            <span>AI Trends Research</span>
-                        </div>
-                        <div class="example-item" data-example="Navigate to news websites and analyze current events">
-                            <i class="fas fa-newspaper"></i>
-                            <span>News Analysis</span>
-                        </div>
-                        <div class="example-item" data-example="Take screenshots and document the user interface">
-                            <i class="fas fa-desktop"></i>
-                            <span>UI Documentation</span>
-                        </div>
+                <div class="conversation-list">
+                    <div class="section-header">
+                        <h3>Conversations</h3>
+                        <button class="new-chat-btn" id="newChatBtn">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="conversations" id="conversationsList">
+                        <!-- Les conversations seront injectées ici -->
                     </div>
                 </div>
             </div>
@@ -80,15 +129,34 @@
         <!-- Main Content -->
         <div class="main-content">
             <div class="chat-header">
-                <h1 id="chatTitle">Intelligent Web Assistant</h1>
+                <h1 id="chatTitle">Assistant Web Intelligent</h1>
                 <div class="chat-controls">
+                    <div class="dropdown" id="exportDropdown">
+                        <button class="control-btn" id="exportBtn">
+                            <i class="fas fa-download"></i>
+                            Exporter
+                        </button>
+                        <div class="dropdown-menu">
+                            <button class="dropdown-item" data-format="markdown">
+                                <i class="fab fa-markdown"></i> Markdown
+                            </button>
+                            <button class="dropdown-item" data-format="html">
+                                <i class="fas fa-code"></i> HTML
+                            </button>
+                            <button class="dropdown-item" data-format="pdf">
+                                <i class="fas fa-file-pdf"></i> PDF
+                            </button>
+                            <button class="dropdown-item" data-format="csv">
+                                <i class="fas fa-file-csv"></i> CSV
+                            </button>
+                            <button class="dropdown-item" data-format="images">
+                                <i class="fas fa-images"></i> Images
+                            </button>
+                        </div>
+                    </div>
                     <button class="control-btn" id="clearChat">
                         <i class="fas fa-trash"></i>
-                        Clear Chat
-                    </button>
-                    <button class="control-btn" id="exportChat">
-                        <i class="fas fa-download"></i>
-                        Export
+                        Effacer
                     </button>
                 </div>
             </div>
@@ -99,30 +167,44 @@
                         <div class="welcome-icon">
                             <i class="fas fa-robot"></i>
                         </div>
-                        <h2>Welcome to MCP Advanced Assistant</h2>
-                        <p>Your intelligent web automation and research companion. Choose a mode and start your conversation.</p>
+                        <h2>Bienvenue sur MCP Client Avancé</h2>
+                        <p>Votre compagnon intelligent pour l'automatisation web et la recherche. Choisissez un mode et commencez votre conversation.</p>
                         <div class="welcome-features">
                             <div class="feature">
                                 <i class="fas fa-globe"></i>
-                                <span>Web Navigation</span>
+                                <span>Navigation Web</span>
                             </div>
                             <div class="feature">
                                 <i class="fas fa-search"></i>
-                                <span>Research & Analysis</span>
+                                <span>Recherche & Analyse</span>
                             </div>
                             <div class="feature">
                                 <i class="fas fa-cogs"></i>
-                                <span>Task Automation</span>
+                                <span>Automatisation</span>
                             </div>
                         </div>
                     </div>
+                </div>
+                
+                <!-- Barre de progression des tâches -->
+                <div class="task-progress-container" id="taskProgressContainer">
+                    <div class="progress-header">
+                        <span class="progress-title">Exécution en cours</span>
+                        <button class="progress-detail-btn" id="progressDetailBtn">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-step" id="currentStep">Initialisation...</div>
                 </div>
                 
                 <div class="input-container">
                     <div class="input-wrapper">
                         <textarea 
                             id="messageInput" 
-                            placeholder="Type your message or describe a task..."
+                            placeholder="Écrivez un message ou décrivez une tâche..."
                             rows="1"
                         ></textarea>
                         <div class="input-actions">
@@ -135,14 +217,14 @@
                         </div>
                     </div>
                     <div class="input-footer">
-                        <span class="input-hint">Press Enter to send, Shift+Enter for new line</span>
+                        <span class="input-hint">Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne</span>
                         <div class="typing-indicator" id="typingIndicator">
                             <div class="typing-dots">
                                 <span></span>
                                 <span></span>
                                 <span></span>
                             </div>
-                            <span>Assistant is thinking...</span>
+                            <span>L'assistant réfléchit...</span>
                         </div>
                     </div>
                 </div>
@@ -151,20 +233,120 @@
     </div>
     
     <!-- Modals -->
-    <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-overlay" id="imageModalOverlay">
         <div class="modal" id="imageModal">
             <div class="modal-header">
-                <h3>Screenshot</h3>
-                <button class="modal-close" id="closeModal">
+                <h3>Capture d'écran</h3>
+                <button class="modal-close" id="closeImageModal">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-content">
-                <img id="modalImage" src="" alt="Screenshot">
+                <img id="modalImage" src="" alt="Capture d'écran">
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="downloadImageBtn">
+                        <i class="fas fa-download"></i> Télécharger
+                    </button>
+                </div>
             </div>
         </div>
     </div>
     
-    <script src="/static/app.js"></script>
+    <div class="modal-overlay" id="taskDetailModalOverlay">
+        <div class="modal task-detail-modal" id="taskDetailModal">
+            <div class="modal-header">
+                <h3>Détails d'exécution</h3>
+                <button class="modal-close" id="closeTaskDetailModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="task-steps" id="taskStepsContainer">
+                    <!-- Les étapes seront injectées ici -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="avatarModalOverlay">
+        <div class="modal" id="avatarModal">
+            <div class="modal-header">
+                <h3>Modifier l'avatar</h3>
+                <button class="modal-close" id="closeAvatarModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="avatar-preview">
+                    <img id="avatarPreview" src="/static/default-avatar.png" alt="Aperçu">
+                </div>
+                <div class="avatar-options">
+                    <label class="btn btn-primary avatar-upload">
+                        <i class="fas fa-upload"></i> Téléverser une image
+                        <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+                    </label>
+                    <div class="avatar-colors">
+                        <div class="color-option" style="background-color: #4f46e5;" data-color="#4f46e5"></div>
+                        <div class="color-option" style="background-color: #10b981;" data-color="#10b981"></div>
+                        <div class="color-option" style="background-color: #f59e0b;" data-color="#f59e0b"></div>
+                        <div class="color-option" style="background-color: #ef4444;" data-color="#ef4444"></div>
+                        <div class="color-option" style="background-color: #8b5cf6;" data-color="#8b5cf6"></div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="cancelAvatarBtn">Annuler</button>
+                    <button class="btn btn-primary" id="saveAvatarBtn">Enregistrer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="resultModalOverlay">
+        <div class="modal result-modal" id="resultModal">
+            <div class="modal-header">
+                <h3>Résultat</h3>
+                <button class="modal-close" id="closeResultModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="result-content" id="resultContent"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="downloadResultBtn">
+                        <i class="fas fa-download"></i> Télécharger
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Screenshot Gallery Modal -->
+    <div class="modal-overlay" id="galleryModalOverlay">
+        <div class="modal gallery-modal" id="galleryModal">
+            <div class="modal-header">
+                <h3>Captures d'écran</h3>
+                <button class="modal-close" id="closeGalleryModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="gallery-container" id="screenshotGallery">
+                    <!-- Les captures d'écran seront injectées ici -->
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="downloadAllImagesBtn">
+                        <i class="fas fa-download"></i> Tout télécharger
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="./app.js"></script>
 </body>
 </html>
