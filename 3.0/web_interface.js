@@ -74,17 +74,20 @@ app.use(express.static(path.join(__dirname, 'static')));
 async function getOrCreateChatSession(sessionId) {
   if (!(sessionId in chatSessions)) {
     // Load configuration
+    const env = Configuration.loadEnv();
+    
+    // Create HTTP server config
     const httpServerConfig = {
       name: 'gemini_http_server',
       config: {
-        base_url: process.env.MCP_SERVER_URL || 'http://localhost:8080'
+        base_url: env.MCP_SERVER_URL || 'http://localhost:8080'
       }
     };
     
     // LLM configuration
-    const llmProject = process.env.GOOGLE_CLOUD_PROJECT || '';
-    const llmLocation = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-    const llmModel = process.env.LLM_MODEL_NAME || 'gemini-2.0-flash';
+    const llmProject = env.GOOGLE_CLOUD_PROJECT || '';
+    const llmLocation = env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+    const llmModel = env.LLM_MODEL_NAME || 'gemini-1.5-pro';
     
     // Initialize components
     const geminiServer = new HTTPServer(
@@ -257,7 +260,6 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
     let stopReason = 'tool_use';
     let stepCount = 0;
     const maxSteps = 20;
-    let nextParsedToolCall = parsedToolCall;
     
     while (stopReason === 'tool_use' && stepCount < maxSteps) {
       stepCount++;
@@ -265,20 +267,20 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
       await manager.sendMessage(sessionId, {
         type: 'task_step',
         step: stepCount,
-        tool_name: nextParsedToolCall.tool,
-        tool_args: nextParsedToolCall.arguments || {},
-        message: `Step ${stepCount}: Executing ${nextParsedToolCall.tool}`
+        tool_name: parsedToolCall.tool,
+        tool_args: parsedToolCall.arguments || {},
+        message: `Step ${stepCount}: Executing ${parsedToolCall.tool}`
       });
       
       // Execute the tool
       const toolCalls = [{
-        tool: nextParsedToolCall.tool,
-        arguments: nextParsedToolCall.arguments || {},
+        tool: parsedToolCall.tool,
+        arguments: parsedToolCall.arguments || {},
         toolUseId: uuidv4()
       }];
       
       // Process tool requests
-      const toolResults = await chatSession.processToolRequests(toolCalls);
+      const toolResults = await processToolRequests(toolCalls, chatSession);
       
       // Add tool results to conversation
       chatSession.conversation.addMessage('user', toolResults.content);
@@ -300,7 +302,7 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
       const nextLlmResponse = await chatSession.llmClient.getResponse(nextPrompt);
       
       // Parse next tool call
-      nextParsedToolCall = LLMClient.extractToolCallJson(nextLlmResponse);
+      parsedToolCall = LLMClient.extractToolCallJson(nextLlmResponse);
       
       // Add response to conversation
       chatSession.conversation.addMessage('assistant', nextLlmResponse);
@@ -311,7 +313,7 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
       });
       
       // Check if we should continue with tool execution
-      if (nextParsedToolCall) {
+      if (parsedToolCall) {
         stopReason = 'tool_use';
       } else {
         stopReason = 'content_stopped';
@@ -339,6 +341,29 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
       message: `Error executing task: ${error.message}`
     });
   }
+}
+
+async function processToolRequests(toolCalls, chatSession) {
+  const consolidatedResult = {
+    role: 'user',
+    content: []
+  };
+  
+  for (const toolCall of toolCalls) {
+    const toolName = toolCall.tool;
+    const toolId = toolCall.toolUseId || uuidv4();
+    const toolArgs = toolCall.arguments || {};
+    
+    // Execute the tool
+    const result = await chatSession.geminiServer.executeTool(toolName, toolArgs, toolId);
+    
+    // Add the result to the consolidated result
+    if ('toolResult' in result && 'content' in result.toolResult) {
+      consolidatedResult.content.push(...result.toolResult.content);
+    }
+  }
+  
+  return consolidatedResult;
 }
 
 async function executeToolWithFeedback(sessionId, toolCall, chatSession) {
