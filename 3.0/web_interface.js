@@ -8,7 +8,7 @@ const winston = require('winston');
 const dotenv = require('dotenv');
 
 // Import the MCP client components
-const { Configuration, HTTPServer, LLMClient, ChatSession } = require('./client');
+const { Configuration, HTTPServer, LLMClient, ChatSession } = require('./enhanced_client');
 
 // Load environment variables
 dotenv.config();
@@ -119,9 +119,17 @@ wss.on('connection', (ws, req) => {
   // Register connection
   manager.connect(ws, sessionId);
   
+  // Set up a ping interval to keep the connection alive
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === ws.OPEN) {
+      ws.ping();
+    }
+  }, 30000); // Send a ping every 30 seconds
+  
   ws.on('message', async (data) => {
     try {
       const messageData = JSON.parse(data);
+      logger.info(`Received message from client ${sessionId}: ${messageData.type}`);
       
       // Get or create chat session
       const chatSession = await getOrCreateChatSession(sessionId);
@@ -141,10 +149,12 @@ wss.on('connection', (ws, req) => {
   });
   
   ws.on('close', () => {
+    clearInterval(pingInterval); // Clear the ping interval
     manager.disconnect(sessionId);
   });
   
   ws.on('error', (error) => {
+    clearInterval(pingInterval); // Clear the ping interval
     logger.error(`WebSocket error for session ${sessionId}: ${error.message}`);
     manager.disconnect(sessionId);
   });
@@ -259,7 +269,7 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
     // Task automation loop
     let stopReason = 'tool_use';
     let stepCount = 0;
-    const maxSteps = 20;
+    const maxSteps = 40; // Increased from 20 to 40
     
     while (stopReason === 'tool_use' && stepCount < maxSteps) {
       stepCount++;
@@ -279,8 +289,10 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
         toolUseId: uuidv4()
       }];
       
+      logger.info(`Executing tool: ${parsedToolCall.tool} with args: ${JSON.stringify(parsedToolCall.arguments || {})}`);
+      
       // Process tool requests
-      const toolResults = await processToolRequests(toolCalls, chatSession);
+      const toolResults = await chatSession.processToolRequests(toolCalls);
       
       // Add tool results to conversation
       chatSession.conversation.addMessage('user', toolResults.content);
@@ -299,7 +311,9 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
       
       // Get next response from model
       const nextPrompt = 'Continue with the task. What\'s the next step?';
+      logger.info(`Sending next prompt to model: ${nextPrompt}`);
       const nextLlmResponse = await chatSession.llmClient.getResponse(nextPrompt);
+      logger.info(`Received model response: ${nextLlmResponse.substring(0, 100)}...`);
       
       // Parse next tool call
       parsedToolCall = LLMClient.extractToolCallJson(nextLlmResponse);
@@ -314,8 +328,10 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
       
       // Check if we should continue with tool execution
       if (parsedToolCall) {
+        logger.info(`Found tool call in response: ${parsedToolCall.tool}`);
         stopReason = 'tool_use';
       } else {
+        logger.info('No tool call found in response, stopping execution');
         stopReason = 'content_stopped';
         await manager.sendMessage(sessionId, {
           type: 'task_completed',
@@ -344,26 +360,34 @@ async function handleTaskExecution(sessionId, taskDescription, chatSession) {
 }
 
 async function processToolRequests(toolCalls, chatSession) {
-  const consolidatedResult = {
-    role: 'user',
-    content: []
-  };
-  
-  for (const toolCall of toolCalls) {
-    const toolName = toolCall.tool;
-    const toolId = toolCall.toolUseId || uuidv4();
-    const toolArgs = toolCall.arguments || {};
+  try {
+    logger.info(`Processing ${toolCalls.length} tool calls`);
+    const consolidatedResult = {
+      role: 'user',
+      content: []
+    };
     
-    // Execute the tool
-    const result = await chatSession.geminiServer.executeTool(toolName, toolArgs, toolId);
-    
-    // Add the result to the consolidated result
-    if ('toolResult' in result && 'content' in result.toolResult) {
-      consolidatedResult.content.push(...result.toolResult.content);
+    for (const toolCall of toolCalls) {
+      const toolName = toolCall.tool;
+      const toolId = toolCall.toolUseId || uuidv4();
+      const toolArgs = toolCall.arguments || {};
+      
+      // Execute the tool
+      logger.info(`Executing tool from processToolRequests: ${toolName} with args: ${JSON.stringify(toolArgs)}`);
+      const result = await chatSession.geminiServer.executeTool(toolName, toolArgs, toolId);
+      logger.info(`Tool execution result received with ${result.toolResult?.content?.length || 0} content items`);
+      
+      // Add the result to the consolidated result
+      if ('toolResult' in result && 'content' in result.toolResult) {
+        consolidatedResult.content.push(...result.toolResult.content);
+      }
     }
+    
+    return consolidatedResult;
+  } catch (error) {
+    logger.error(`Error processing tool requests: ${error.message}`);
+    throw error;
   }
-  
-  return consolidatedResult;
 }
 
 async function executeToolWithFeedback(sessionId, toolCall, chatSession) {
