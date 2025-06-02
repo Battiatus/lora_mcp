@@ -897,7 +897,7 @@ class ChatSession {
     const llmRawResponse = await this.llmClient.getResponse(taskDescription);
     
     // Check if it's a tool call
-    const parsedToolCall = LLMClient.extractToolCallJson(llmRawResponse);
+    let parsedToolCall = LLMClient.extractToolCallJson(llmRawResponse);
     
     if (!parsedToolCall) {
       // Not a tool call, just a regular response
@@ -950,14 +950,14 @@ class ChatSession {
       
       // Create a simple text prompt for the next request
       const nextPrompt = 'Continue with the task. What\'s the next step?';
-      const llmRawResponse = await this.llmClient.getResponse(nextPrompt);
+      const nextLlmRawResponse = await this.llmClient.getResponse(nextPrompt);
       
       // Parse next tool call
-      const parsedToolCall = LLMClient.extractToolCallJson(llmRawResponse);
+      parsedToolCall = LLMClient.extractToolCallJson(nextLlmRawResponse);
       
       // Add response to conversation
-      this.conversation.addMessage('assistant', llmRawResponse);
-      console.log(`\nAssistant: ${llmRawResponse}`);
+      this.conversation.addMessage('assistant', nextLlmRawResponse);
+      console.log(`\nAssistant: ${nextLlmRawResponse}`);
       
       // Check if we should continue with tool execution
       if (parsedToolCall) {
