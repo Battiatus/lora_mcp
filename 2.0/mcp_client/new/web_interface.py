@@ -15,10 +15,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
-import sys, os
+from dotenv import load_dotenv
+
+# load .env file to environment
+load_dotenv()
+
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-
 # Import your existing HTTP MCP client
 from main import ChatSession, HTTPServer, LLMClient, Configuration
 
@@ -107,6 +110,16 @@ async def get_or_create_chat_session(session_id: str) -> ChatSession:
 async def get_interface():
     """Serve the main interface"""
     return FileResponse("static/index.html")
+
+@app.get("/style")
+async def get_style():
+    """Serve the CSS style"""
+    return FileResponse("static/styles.css")
+
+@app.get("/app.js")
+async def get_app_js():
+    """Serve the main JavaScript file"""
+    return FileResponse("static/app.js")
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
