@@ -9,3 +9,6 @@ __pycache__/
 *artefacts
 *screenshot
 # Logs
+
+
+*/node_modules
