@@ -55,6 +55,9 @@ const Header = () => {
                   <Link to="/tools" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
                     Outils
                   </Link>
+                  <Link to="/tasks" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    Chat
+                  </Link>
                   {userProfile?.role === 'admin' && (
                     <Link to="/admin" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
                       Administration
