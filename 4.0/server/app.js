@@ -1,66 +1,89 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { v4: uuidv4 } = require('uuid');
-const winston = require('winston');
-const admin = require('firebase-admin');
-const { getAuth } = require('firebase-admin/auth');
-const serviceAccount = require('./firebase-service-account.json');
-const { toolRouter } = require('./routes/tools.js');
-const { sessionsRouter } = require('./routes/sessions');
-const { resourcesRouter } = require('./routes/resources');
-const { setupLogging } = require('./middleware/logging');
-const { authenticateJWT } = require('./middleware/auth');
-const { errorHandler } = require('./middleware/error-handler');
-const { rateLimiter } = require('./middleware/rate-limiter');
+const compression = require('compression');
+const morgan = require('morgan');
+const { rateLimit } = require('express-rate-limit');
+const swaggerUi = require('swagger-ui-express');
+const dotenv = require('dotenv');
 
-// Initialize Firebase Admin
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+// Chargement des variables d'environnement
+dotenv.config();
 
-// Create Winston logger
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  defaultMeta: { service: 'mcp-server' },
-  transports: [
-    new winston.transports.Console(),
-    // Firebase Logging Transport will be added by setupLogging
-  ]
-});
+// Importation des utilitaires et middleware
+const { logger } = require('./utils/logger');
+const errorHandler = require('./middleware/errorHandler');
+const specs = require('./config/swagger');
 
-// Create Express app
+// Importation des routes
+const authRoutes = require('./routes/authRoutes');
+const toolRoutes = require('./routes/toolRoutes');
+
+// Initialisation de l'application Express
 const app = express();
 
-// Apply middleware
-app.use(helmet()); // Security headers
-app.use(cors({ 
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
-  credentials: true 
-}));
-app.use(express.json());
-app.use(rateLimiter); // Rate limiting
-app.use(setupLogging(logger, admin)); // Logging
+// Configuration des middleware de base
+app.use(helmet()); // Sécurité des en-têtes HTTP
+app.use(compression()); // Compression des réponses
+app.use(express.json({ limit: '10mb' })); // Parsing JSON avec limite
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check endpoint (no auth required)
+// Configuration du logging
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+
+// Configuration CORS
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || '*',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
+
+// Limiteur de débit global pour prévenir les attaques par force brute
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limite chaque IP à 100 requêtes par fenêtre
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 429,
+    message: 'Trop de requêtes, veuillez réessayer après un moment'
+  }
+});
+app.use('/api', apiLimiter);
+
+// Routes de santé et version (non protégées)
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', service: 'mcp-server' });
+  res.status(200).json({
+    status: 'healthy',
+    service: 'mcp-server-api',
+    version: process.env.npm_package_version || '1.0.0'
+  });
 });
 
-// API documentation (no auth required)
-app.use('/api-docs', express.static('docs'));
+// Documentation Swagger
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "MCP Server API Documentation"
+}));
 
-// Protected routes
-app.use('/api/tools', authenticateJWT, toolRouter);
-app.use('/api/sessions', authenticateJWT, sessionsRouter);
-app.use('/api/resources', authenticateJWT, resourcesRouter);
+// Routes API
+app.use('/api/auth', authRoutes);
+app.use('/api/tools', toolRoutes);
 
-// Error handling
+// Route 404 pour les endpoints non trouvés
+app.use('*', (req, res) => {
+  res.status(404).json({
+    status: 'error',
+    message: `La route ${req.originalUrl} n'existe pas`
+  });
+});
+
+// Middleware de gestion d'erreurs global
 app.use(errorHandler);
 
-// Export for testing and starting
-module.exports = { app, logger };
+module.exports = app;
