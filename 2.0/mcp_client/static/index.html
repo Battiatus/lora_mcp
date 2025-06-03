@@ -7,1461 +7,10 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
-    <!-- <link rel="stylesheet" href="style/styles.css"> -->
+    <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-<style>
-/* Reset and base styles */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
 
-:root {
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --secondary-color: #64748b;
-    --success-color: #10b981;
-    --warning-color: #f59e0b;
-    --error-color: #ef4444;
-    --background: #f8fafc;
-    --surface: #ffffff;
-    --surface-hover: #f1f5f9;
-    --border: #e2e8f0;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --border-radius: 8px;
-    --transition: all 0.2s ease-in-out;
-}
-
-body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: var(--background);
-    color: var(--text-primary);
-    line-height: 1.6;
-    overflow-x: hidden;
-}
-
-/* Login Styles */
-.login-container {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
-    padding: 20px;
-}
-
-.login-card {
-    background: var(--surface);
-    border-radius: 16px;
-    padding: 40px;
-    box-shadow: var(--shadow-lg);
-    width: 100%;
-    max-width: 400px;
-    animation: slideUp 0.5s ease-out;
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.login-header {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.login-header .logo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.login-header .logo i {
-    font-size: 32px;
-    color: var(--primary-color);
-}
-
-.login-header h1 {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.login-header p {
-    color: var(--text-secondary);
-    margin-top: 8px;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-.form-group input {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid var(--border);
-    border-radius: var(--border-radius);
-    font-size: 16px;
-    transition: var(--transition);
-    background: var(--surface);
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
-}
-
-.login-btn {
-    width: 100%;
-    padding: 12px 16px;
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius);
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.login-btn:hover {
-    background: var(--primary-hover);
-    transform: translateY(-1px);
-}
-
-.login-error {
-    margin-top: 16px;
-    padding: 12px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: var(--border-radius);
-    color: var(--error-color);
-    font-size: 14px;
-    display: none;
-}
-
-/* App Layout */
-.app-container {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: var(--background);
-}
-
-/* Header */
-.app-header {
-    height: 64px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    box-shadow: var(--shadow-sm);
-    z-index: 1000;
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.sidebar-toggle {
-    background: none;
-    border: none;
-    padding: 8px;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: var(--transition);
-}
-
-.sidebar-toggle:hover {
-    background: var(--surface-hover);
-    color: var(--text-primary);
-}
-
-.logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-weight: 600;
-    color: var(--primary-color);
-}
-
-.logo i {
-    font-size: 24px;
-}
-
-.header-center h1 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.api-limits {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--surface-hover);
-    border-radius: var(--border-radius);
-    font-size: 14px;
-    color: var(--text-secondary);
-}
-
-.user-menu {
-    position: relative;
-}
-
-.user-avatar {
-    background: none;
-    border: none;
-    cursor: pointer;
-    border-radius: 50%;
-    overflow: hidden;
-    width: 40px;
-    height: 40px;
-}
-
-.user-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.user-dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: 8px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-lg);
-    min-width: 200px;
-    z-index: 1000;
-    display: none;
-}
-
-.user-dropdown.show {
-    display: block;
-    animation: slideDown 0.2s ease-out;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.user-info {
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.user-info img {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.dropdown-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 8px 0;
-}
-
-.dropdown-item {
-    width: 100%;
-    padding: 12px 16px;
-    background: none;
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--text-primary);
-}
-
-.dropdown-item:hover {
-    background: var(--surface-hover);
-}
-
-/* App Body */
-.app-body {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-}
-
-/* Sidebar */
-.sidebar {
-    width: 320px;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    transition: var(--transition);
-    overflow: hidden;
-}
-
-.sidebar.collapsed {
-    width: 0;
-    min-width: 0;
-}
-
-.sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid var(--border);
-}
-
-.new-chat-btn {
-    width: 100%;
-    padding: 12px 16px;
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius);
-    font-weight: 500;
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-bottom: 16px;
-}
-
-.new-chat-btn:hover {
-    background: var(--primary-hover);
-}
-
-.status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: var(--text-secondary);
-}
-
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--success-color);
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-.sidebar-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-}
-
-.conversations-section h3,
-.mode-selector + .quick-actions h3,
-.examples-section h3 {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.conversations-list {
-    margin-bottom: 24px;
-}
-
-.conversation-item {
-    padding: 12px;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: var(--transition);
-    margin-bottom: 4px;
-    border: 1px solid transparent;
-}
-
-.conversation-item:hover {
-    background: var(--surface-hover);
-    border-color: var(--border);
-}
-
-.conversation-item.active {
-    background: var(--primary-color);
-    color: white;
-}
-
-.conversation-title {
-    font-weight: 500;
-    margin-bottom: 4px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.conversation-date {
-    font-size: 12px;
-    opacity: 0.7;
-}
-
-.sidebar-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 20px 0;
-}
-
-.mode-selector {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 24px;
-}
-
-.mode-btn {
-    flex: 1;
-    padding: 12px;
-    background: var(--surface-hover);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.mode-btn.active {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-}
-
-.mode-btn i {
-    font-size: 16px;
-}
-
-.action-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 24px;
-}
-
-.action-btn {
-    padding: 12px;
-    background: var(--surface-hover);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.action-btn:hover {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-}
-
-.examples-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.example-item {
-    padding: 12px;
-    background: var(--surface-hover);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-}
-
-.example-item:hover {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-}
-
-.example-item i {
-    font-size: 16px;
-    margin-top: 2px;
-    flex-shrink: 0;
-}
-
-.example-item span {
-    font-size: 14px;
-    line-height: 1.4;
-}
-
-/* Main Content */
-.main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-/* Progress Bar */
-.progress-container {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 16px 24px;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 6px;
-    background: var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 12px;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--primary-color), #3b82f6);
-    border-radius: 3px;
-    transition: width 0.3s ease;
-    width: 0%;
-}
-
-.progress-info {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.progress-details-btn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: var(--border-radius);
-    transition: var(--transition);
-}
-
-.progress-details-btn:hover {
-    background: var(--surface-hover);
-    color: var(--primary-color);
-}
-
-/* Chat Container */
-.chat-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.messages-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
-    scroll-behavior: smooth;
-}
-
-/* Welcome Message */
-.welcome-message {
-    text-align: center;
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 60px 20px;
-}
-
-.welcome-icon {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, var(--primary-color), #3b82f6);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 24px;
-}
-
-.welcome-icon i {
-    font-size: 32px;
-    color: white;
-}
-
-.welcome-message h2 {
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 16px;
-    color: var(--text-primary);
-}
-
-.welcome-message p {
-    font-size: 18px;
-    color: var(--text-secondary);
-    margin-bottom: 32px;
-}
-
-.welcome-features {
-    display: flex;
-    justify-content: center;
-    gap: 32px;
-    flex-wrap: wrap;
-}
-
-.feature {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 20px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius);
-    transition: var(--transition);
-}
-
-.feature:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
-}
-
-.feature i {
-    font-size: 24px;
-    color: var(--primary-color);
-}
-
-/* Messages */
-.message {
-    margin-bottom: 24px;
-    animation: fadeInUp 0.3s ease-out;
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.message-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-}
-
-.message-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.message.user .message-avatar {
-    background: var(--primary-color);
-    color: white;
-}
-
-.message.assistant .message-avatar {
-    background: var(--success-color);
-    color: white;
-}
-
-.message.system .message-avatar {
-    background: var(--warning-color);
-    color: white;
-}
-
-.message-info {
-    flex: 1;
-}
-
-.message-sender {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.message-time {
-    font-size: 12px;
-    color: var(--text-muted);
-}
-
-.message-content {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius);
-    padding: 16px;
-    margin-left: 44px;
-    position: relative;
-}
-
-.message.user .message-content {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-}
-
-.message-content::before {
-    content: '';
-    position: absolute;
-    top: 12px;
-    left: -8px;
-    width: 0;
-    height: 0;
-    border-top: 8px solid transparent;
-    border-bottom: 8px solid transparent;
-    border-right: 8px solid var(--surface);
-}
-
-.message.user .message-content::before {
-    border-right-color: var(--primary-color);
-}
-
-/* Markdown content styling */
-.message-content h1,
-.message-content h2,
-.message-content h3,
-.message-content h4,
-.message-content h5,
-.message-content h6 {
-    margin: 16px 0 8px 0;
-    font-weight: 600;
-}
-
-.message-content h1 { font-size: 24px; }
-.message-content h2 { font-size: 20px; }
-.message-content h3 { font-size: 18px; }
-.message-content h4 { font-size: 16px; }
-
-.message-content p {
-    margin: 8px 0;
-    line-height: 1.6;
-}
-
-.message-content ul,
-.message-content ol {
-    margin: 8px 0;
-    padding-left: 24px;
-}
-
-.message-content li {
-    margin: 4px 0;
-}
-
-.message-content pre {
-    background: #1e1e1e;
-    color: #d4d4d4;
-    padding: 16px;
-    border-radius: var(--border-radius);
-    overflow-x: auto;
-    margin: 12px 0;
-    font-family: 'Fira Code', 'Consolas', monospace;
-}
-
-.message-content code {
-    background: rgba(0, 0, 0, 0.1);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: 'Fira Code', 'Consolas', monospace;
-    font-size: 14px;
-}
-
-.message-content pre code {
-    background: none;
-    padding: 0;
-}
-
-.message-content blockquote {
-    border-left: 4px solid var(--primary-color);
-    padding-left: 16px;
-    margin: 12px 0;
-    font-style: italic;
-    opacity: 0.8;
-}
-
-.message-content table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 12px 0;
-}
-
-.message-content th,
-.message-content td {
-    padding: 8px 12px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-}
-
-.message-content th {
-    background: var(--surface-hover);
-    font-weight: 600;
-}
-
-/* Tool execution indicators */
-.tool-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--surface-hover);
-    border-radius: var(--border-radius);
-    margin: 8px 0;
-    font-size: 14px;
-}
-
-.tool-indicator.executing {
-    color: var(--warning-color);
-}
-
-.tool-indicator.success {
-    color: var(--success-color);
-}
-
-.tool-indicator.error {
-    color: var(--error-color);
-}
-
-.tool-indicator i {
-    animation: spin 1s linear infinite;
-}
-
-.tool-indicator.success i,
-.tool-indicator.error i {
-    animation: none;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-/* Message actions */
-.message-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-    opacity: 0;
-    transition: var(--transition);
-}
-
-.message:hover .message-actions {
-    opacity: 1;
-}
-
-.message-action {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius);
-    padding: 6px 12px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: var(--transition);
-    color: var(--text-secondary);
-}
-
-.message-action:hover {
-    background: var(--surface-hover);
-    color: var(--text-primary);
-}
-
-/* Result preview */
-.result-preview {
-    max-height: 300px;
-    overflow: hidden;
-    position: relative;
-}
-
-.result-preview.truncated::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 40px;
-    background: linear-gradient(transparent, var(--surface));
-}
-
-.show-more-btn {
-    margin-top: 12px;
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius);
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.show-more-btn:hover {
-    background: var(--primary-hover);
-}
-
-/* Screenshots gallery */
-.screenshots-summary {
-    margin-top: 16px;
-    padding: 16px;
-    background: var(--surface-hover);
-    border-radius: var(--border-radius);
-}
-
-.screenshots-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 12px;
-    margin-top: 12px;
-}
-
-.screenshot-thumb {
-    aspect-ratio: 16/9;
-    background: var(--border);
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.screenshot-thumb:hover {
-    transform: scale(1.05);
-    box-shadow: var(--shadow);
-}
-
-.screenshot-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-/* Input Container */
-.input-container {
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    padding: 20px 24px;
-}
-
-.input-wrapper {
-    display: flex;
-    align-items: flex-end;
-    gap: 12px;
-    background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: 12px;
-    padding: 12px;
-    transition: var(--transition);
-}
-
-.input-wrapper:focus-within {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
-}
-
-#messageInput {
-    flex: 1;
-    border: none;
-    outline: none;
-    resize: none;
-    font-family: inherit;
-    font-size: 16px;
-    line-height: 1.5;
-    background: transparent;
-    color: var(--text-primary);
-    max-height: 120px;
-}
-
-#messageInput::placeholder {
-    color: var(--text-muted);
-}
-
-.input-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.action-btn-small {
-    width: 36px;
-    height: 36px;
-    background: none;
-    border: none;
-    border-radius: var(--border-radius);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: var(--transition);
-    color: var(--text-secondary);
-}
-
-.action-btn-small:hover {
-    background: var(--surface-hover);
-    color: var(--text-primary);
-}
-
-.send-btn {
-    width: 36px;
-    height: 36px;
-    background: var(--primary-color);
-    border: none;
-    border-radius: var(--border-radius);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: var(--transition);
-    color: white;
-}
-
-.send-btn:hover {
-    background: var(--primary-hover);
-    transform: translateY(-1px);
-}
-
-.send-btn:disabled {
-    background: var(--text-muted);
-    cursor: not-allowed;
-    transform: none;
-}
-
-.send-btn.stop {
-    background: var(--error-color);
-}
-
-.send-btn.stop:hover {
-    background: #dc2626;
-}
-
-.input-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 12px;
-}
-
-.input-hint {
-    font-size: 12px;
-    color: var(--text-muted);
-}
-
-.typing-indicator {
-    display: none;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: var(--text-secondary);
-}
-
-.typing-indicator.show {
-    display: flex;
-}
-
-.typing-dots {
-    display: flex;
-    gap: 4px;
-}
-
-.typing-dots span {
-    width: 6px;
-    height: 6px;
-    background: var(--primary-color);
-    border-radius: 50%;
-    animation: typing 1.4s ease-in-out infinite;
-}
-
-.typing-dots span:nth-child(2) {
-    animation-delay: 0.2s;
-}
-
-.typing-dots span:nth-child(3) {
-    animation-delay: 0.4s;
-}
-
-@keyframes typing {
-    0%, 60%, 100% {
-        transform: translateY(0);
-    }
-    30% {
-        transform: translateY(-10px);
-    }
-}
-
-/* Modals */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    padding: 20px;
-}
-
-.modal-overlay.show {
-    display: flex;
-    animation: fadeIn 0.2s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.modal {
-    background: var(--surface);
-    border-radius: 12px;
-    box-shadow: var(--shadow-lg);
-    max-width: 600px;
-    width: 100%;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    animation: slideUp 0.3s ease-out;
-}
-
-.modal.large {
-    max-width: 90vw;
-    max-height: 90vh;
-}
-
-.modal-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.modal-header h3 {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.modal-actions {
-    display: flex;
-    gap: 12px;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--border-radius);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: var(--transition);
-    color: var(--text-secondary);
-}
-
-.modal-close:hover {
-    background: var(--surface-hover);
-    color: var(--text-primary);
-}
-
-.modal-content {
-    flex: 1;
-    padding: 24px;
-    overflow-y: auto;
-}
-
-/* Export options */
-.export-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 16px;
-}
-
-.export-btn {
-    padding: 20px;
-    background: var(--surface-hover);
-    border: 2px solid var(--border);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    text-align: center;
-}
-
-.export-btn:hover {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-    transform: translateY(-2px);
-}
-
-.export-btn i {
-    font-size: 24px;
-}
-
-/* Buttons */
-.btn-primary {
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius);
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: var(--transition);
-    font-weight: 500;
-}
-
-.btn-primary:hover {
-    background: var(--primary-hover);
-}
-
-.btn-secondary {
-    background: var(--surface-hover);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius);
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: var(--transition);
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.btn-secondary:hover {
-    background: var(--border);
-}
-
-/* Responsive Design */
-@media (max-width: 1024px) {
-    .sidebar {
-        width: 280px;
-    }
-    
-    .welcome-features {
-        gap: 16px;
-    }
-    
-    .feature {
-        padding: 16px;
-    }
-}
-
-@media (max-width: 768px) {
-    .app-header {
-        padding: 0 16px;
-    }
-    
-    .header-center h1 {
-        display: none;
-    }
-    
-    .sidebar {
-        position: fixed;
-        top: 64px;
-        left: 0;
-        bottom: 0;
-        z-index: 1000;
-        transform: translateX(-100%);
-        width: 280px;
-    }
-    
-    .sidebar.show {
-        transform: translateX(0);
-    }
-    
-    .main-content {
-        width: 100%;
-    }
-    
-    .messages-container {
-        padding: 16px;
-    }
-    
-    .input-container {
-        padding: 16px;
-    }
-    
-    .welcome-message {
-        padding: 40px 16px;
-    }
-    
-    .welcome-message h2 {
-        font-size: 24px;
-    }
-    
-    .welcome-features {
-        flex-direction: column;
-        gap: 12px;
-    }
-    
-    .modal {
-        margin: 20px;
-        max-height: calc(100vh - 40px);
-    }
-    
-    .action-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 480px) {
-    .login-card {
-        padding: 24px;
-    }
-    
-    .app-header {
-        height: 56px;
-        padding: 0 12px;
-    }
-    
-    .logo span {
-        display: none;
-    }
-    
-    .sidebar {
-        top: 56px;
-        width: 100%;
-    }
-    
-    .modal-content {
-        padding: 16px;
-    }
-    
-    .export-options {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --background: #0f172a;
-        --surface: #1e293b;
-        --surface-hover: #334155;
-        --border: #475569;
-        --text-primary: #f1f5f9;
-        --text-secondary: #cbd5e1;
-        --text-muted: #94a3b8;
-    }
-}
-
-/* Loading states */
-.loading {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-.loading::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 20px;
-    height: 20px;
-    margin: -10px 0 0 -10px;
-    border: 2px solid var(--border);
-    border-top-color: var(--primary-color);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-/* Accessibility */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-}
-
-/* Focus styles for keyboard navigation */
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-    :root {
-        --border: #000;
-        --text-secondary: var(--text-primary);
-    }
-}
-</style>
 
     <!-- Login Screen -->
     <div class="login-container" id="loginContainer">
@@ -1514,11 +63,11 @@ textarea:focus-visible {
                 </div>
                 <div class="user-menu">
                     <button class="user-avatar" id="userAvatar">
-                        <img src="/static/default-avatar.png" alt="User" id="avatarImg">
+                        <img src="/avatar" alt="User" id="avatarImg">
                     </button>
                     <div class="user-dropdown" id="userDropdown">
                         <div class="user-info">
-                            <img src="/static/default-avatar.png" alt="User" id="dropdownAvatar">
+                            <img src="/avatar" alt="User" id="dropdownAvatar">
                             <span id="username">User</span>
                         </div>
                         <div class="dropdown-divider"></div>
@@ -2071,59 +620,233 @@ class MCPAssistant {
     }
 
     handleWebSocketMessage(message) {
-        switch (message.type) {
-            case 'progress_update':
-                this.updateProgress(message);
-                break;
-            case 'progress_complete':
-                this.hideProgress();
-                this.setTaskRunning(false);
-                break;
-            case 'assistant_message':
+    switch (message.type) {
+        case 'progress_update':
+            this.updateProgress(message);
+            break;
+        case 'task_completed':
+            this.hideProgress();
+            this.setTaskRunning(false);
+            if (message.final) {
+                this.showTaskResult(message);
+            }
+            break;
+        case 'assistant_message':
+            // Ne pas afficher les messages intermédiaires pendant l'exécution de tâches
+            if (!this.isTaskRunning) {
                 this.addMessage('assistant', message.message, message);
-                if (message.final) {
-                    this.setTaskRunning(false);
-                }
-                break;
-            case 'user_message':
-                this.addMessage('user', message.message, message);
-                break;
-            case 'tool_executing':
-                this.showToolExecution(message);
-                break;
-            case 'tool_success':
-            case 'tool_success_image':
-                this.showToolResult(message);
-                break;
-            case 'tool_error':
-                this.showToolError(message);
-                break;
-            case 'task_started':
-                this.setTaskRunning(true);
-                this.showProgress('Starting task...', 0);
-                break;
-            case 'task_completed':
-                this.hideProgress();
-                this.setTaskRunning(false);
-                if (message.final) {
-                    this.addMessage('assistant', message.message, message);
-                }
-                break;
-            case 'screenshots_summary':
-                this.showScreenshotsSummary(message.screenshots);
-                break;
-            case 'execution_stopped':
-                this.hideProgress();
-                this.setTaskRunning(false);
-                this.addMessage('system', message.message, message);
-                break;
-            case 'error':
-                this.showError(message.message);
-                this.setTaskRunning(false);
-                break;
-        }
+            }
+            break;
+        case 'task_started':
+            this.setTaskRunning(true);
+            this.showProgress('Starting task...', 0);
+            break;
+        case 'execution_stopped':
+            this.hideProgress();
+            this.setTaskRunning(false);
+            this.addMessage('system', message.message, message);
+            break;
+        case 'error':
+            this.showError(message.message);
+            this.setTaskRunning(false);
+            break;
+    }
+}
+
+showTaskResult(message) {
+    // """Afficher le résultat final de la tâche avec screenshots et fichiers"""
+    const container = document.getElementById('messagesContainer');
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    
+    if (welcomeMessage) {
+        welcomeMessage.style.display = 'none';
     }
 
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'message assistant task-result';
+    
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Traiter le contenu du message
+    let processedContent = this.renderMarkdown(message.message);
+    
+    // Créer la section des screenshots si disponibles
+    let screenshotsSection = '';
+    if (message.screenshots && message.screenshots.length > 0) {
+        screenshotsSection = `
+            <div class="screenshots-section">
+                <h4><i class="fas fa-images"></i> Screenshots Captured (${message.screenshots.length})</h4>
+                <div class="screenshots-grid">
+                    ${message.screenshots.map((screenshot, index) => `
+                        <div class="screenshot-item" onclick="mcpAssistant.showScreenshotModal('${screenshot.data}', '${screenshot.format}')">
+                            <img src="data:image/${screenshot.format};base64,${screenshot.data}" 
+                                 alt="Screenshot ${index + 1}" loading="lazy">
+                            <div class="screenshot-caption">Step ${screenshot.step}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Vérifier s'il y a des fichiers créés
+    let filesSection = '';
+    if (message.files_created && message.files_created.length > 0) {
+        filesSection = `
+            <div class="files-section">
+                <h4><i class="fas fa-file"></i> Files Created</h4>
+                <div class="files-list">
+                    ${message.files_created.map(file => `
+                        <div class="file-item">
+                            <div class="file-info">
+                                <i class="fas fa-file-alt"></i>
+                                <span class="file-name">${file.filename}</span>
+                            </div>
+                            <div class="file-actions">
+                                <button class="btn-small" onclick="mcpAssistant.downloadFile('${file.uri}', '${file.filename}')">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                                <button class="btn-small" onclick="mcpAssistant.previewFile('${file.uri}', '${file.filename}')">
+                                    <i class="fas fa-eye"></i> Preview
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    resultDiv.innerHTML = `
+        <div class="message-header">
+            <div class="message-avatar">A</div>
+            <div class="message-info">
+                <div class="message-sender">Assistant</div>
+                <div class="message-time">${timestamp}</div>
+            </div>
+        </div>
+        <div class="message-content task-result-content">
+            <div class="task-summary">
+                <i class="fas fa-check-circle text-success"></i>
+                <span>Task completed in ${message.steps} steps</span>
+            </div>
+            
+            ${this.createResultPreview(processedContent)}
+            
+            ${screenshotsSection}
+            ${filesSection}
+            
+            <div class="result-actions">
+                <button class="btn-secondary" onclick="mcpAssistant.exportTaskResult('${btoa(JSON.stringify(message))}')">
+                    <i class="fas fa-download"></i> Export Complete Result
+                </button>
+                <button class="btn-secondary" onclick="mcpAssistant.shareTaskResult('${message.conversation_id}')">
+                    <i class="fas fa-share"></i> Share
+                </button>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(resultDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+showScreenshotModal(imageData, format) {
+    // """Afficher une capture d'écran en modal"""
+    const modal = document.getElementById('imageModal');
+    const img = document.getElementById('modalImage');
+    img.src = `data:image/${format};base64,${imageData}`;
+    this.showModal('imageModal');
+}
+
+async downloadFile(uri, filename) {
+    // """Télécharger un fichier créé"""
+    try {
+        const response = await fetch(uri, {
+            headers: {
+                'Authorization': `Bearer ${this.authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const content = await response.text();
+            this.downloadContent(btoa(content), filename);
+        } else {
+            this.showNotification('Failed to download file', 'error');
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        this.showNotification('Download failed', 'error');
+    }
+}
+
+async previewFile(uri, filename) {
+    // """Prévisualiser un fichier créé"""
+    try {
+        const response = await fetch(uri, {
+            headers: {
+                'Authorization': `Bearer ${this.authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const content = await response.text();
+            const modal = document.getElementById('resultModal');
+            const contentDiv = document.getElementById('resultContent');
+            
+            // Déterminer le type de contenu et l'afficher approprié
+            if (filename.endsWith('.md')) {
+                contentDiv.innerHTML = this.renderMarkdown(content);
+            } else if (filename.endsWith('.html')) {
+                contentDiv.innerHTML = content;
+            } else if (filename.endsWith('.json')) {
+                contentDiv.innerHTML = `<pre><code class="language-json">${JSON.stringify(JSON.parse(content), null, 2)}</code></pre>`;
+            } else {
+                contentDiv.innerHTML = `<pre><code>${content}</code></pre>`;
+            }
+            
+            this.showModal('resultModal');
+            
+            // Setup download button
+            document.getElementById('downloadResult').onclick = () => {
+                this.downloadContent(btoa(content), filename);
+            };
+        } else {
+            this.showNotification('Failed to preview file', 'error');
+        }
+    } catch (error) {
+        console.error('Preview error:', error);
+        this.showNotification('Preview failed', 'error');
+    }
+}
+
+exportTaskResult(encodedResult) {
+    // """Exporter le résultat complet de la tâche"""
+    const result = JSON.parse(atob(encodedResult));
+    
+    // Créer un rapport complet
+    let report = `# Task Execution Report\n\n`;
+    report += `**Completed:** ${new Date().toLocaleString()}\n`;
+    report += `**Steps:** ${result.steps}\n\n`;
+    report += `## Result\n\n${result.message}\n\n`;
+    
+    if (result.screenshots && result.screenshots.length > 0) {
+        report += `## Screenshots (${result.screenshots.length})\n\n`;
+        result.screenshots.forEach((screenshot, index) => {
+            report += `- Screenshot ${index + 1} (Step ${screenshot.step})\n`;
+        });
+        report += `\n`;
+    }
+    
+    if (result.files_created && result.files_created.length > 0) {
+        report += `## Files Created\n\n`;
+        result.files_created.forEach(file => {
+            report += `- ${file.filename}\n`;
+        });
+    }
+    
+    this.downloadContent(btoa(report), `task_report_${Date.now()}.md`);
+}
     async loadConversations() {
         try {
             const response = await fetch('/conversations', {
@@ -2205,35 +928,70 @@ class MCPAssistant {
         }
     }
 
-    async loadConversation(conversationId) {
-        try {
-            const response = await fetch(`/conversations/${conversationId}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.authToken}`
-                }
-            });
-
-            if (response.ok) {
-                const conversation = await response.json();
-                this.currentConversationId = conversationId;
-                this.clearMessages();
-                this.updateChatTitle(conversation.title);
-                
-                // Load messages
-                conversation.messages.forEach(msg => {
-                    this.addMessage(msg.role, msg.content, { conversation_id: conversationId });
-                });
-
-                // Update active conversation
-                document.querySelectorAll('.conversation-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-                document.querySelector(`[data-conversation-id="${conversationId}"]`)?.classList.add('active');
+async loadConversation(conversationId) {
+    try {
+        const response = await fetch(`/conversations/${conversationId}`, {
+            headers: {
+                'Authorization': `Bearer ${this.authToken}`
             }
-        } catch (error) {
-            console.error('Failed to load conversation:', error);
+        });
+
+        if (response.ok) {
+            const conversation = await response.json();
+            this.currentConversationId = conversationId;
+            this.clearMessages();
+            this.updateChatTitle(conversation.title);
+            
+            // Debug: afficher les messages reçus dans la console
+            console.log("Messages récupérés:", conversation.messages);
+            
+            // Load messages with proper processing
+            if (conversation.messages && Array.isArray(conversation.messages)) {
+                conversation.messages.forEach(msg => {
+                    // Ignore system messages (optionnel - retirez cette condition si vous voulez les afficher)
+                    if (msg.role === 'system') return;
+                    
+                    // Traiter le contenu selon son type
+                    let processedContent = msg.content;
+                    
+                    // Tenter de traiter les contenus qui sont des chaînes représentant des tableaux
+                    if (typeof processedContent === 'string' && 
+                        processedContent.startsWith('[{') && 
+                        processedContent.endsWith('}]')) {
+                        try {
+                            // Utiliser eval pour parser la chaîne (attention: à utiliser avec précaution)
+                            // On pourrait aussi utiliser JSON.parse si le format est JSON valide
+                            const contentArray = eval(processedContent);
+                            if (Array.isArray(contentArray)) {
+                                // Extraire les textes
+                                processedContent = contentArray.map(item => 
+                                    item.text || JSON.stringify(item)
+                                ).join("\n\n");
+                            }
+                        } catch (e) {
+                            console.error("Erreur lors du traitement du contenu:", e);
+                            // En cas d'erreur, garder le contenu original
+                        }
+                    }
+                    
+                    this.addMessage(msg.role, processedContent, { conversation_id: conversationId });
+                });
+            } else {
+                console.error("Format de messages invalide:", conversation.messages);
+            }
+
+            // Update active conversation
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-conversation-id="${conversationId}"]`)?.classList.add('active');
+        } else {
+            console.error("Erreur lors du chargement de la conversation:", response.status);
         }
+    } catch (error) {
+        console.error('Failed to load conversation:', error);
     }
+}
 
     sendMessage() {
         const input = document.getElementById('messageInput');
@@ -2281,46 +1039,68 @@ class MCPAssistant {
         }
     }
 
-    addMessage(role, content, metadata = {}) {
-        const container = document.getElementById('messagesContainer');
-        const welcomeMessage = document.getElementById('welcomeMessage');
-        
-        if (welcomeMessage) {
-            welcomeMessage.style.display = 'none';
-        }
-
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${role}`;
-        
-        const avatarIcon = role === 'user' ? 'U' : 
-                          role === 'assistant' ? 'A' : 'S';
-        
-        const timestamp = new Date().toLocaleTimeString();
-        
-        // Process content based on type
-        let processedContent = content;
-        if (typeof content === 'string') {
-            processedContent = this.renderMarkdown(content);
-        }
-
-        messageDiv.innerHTML = `
-            <div class="message-header">
-                <div class="message-avatar">${avatarIcon}</div>
-                <div class="message-info">
-                    <div class="message-sender">${role.charAt(0).toUpperCase() + role.slice(1)}</div>
-                    <div class="message-time">${timestamp}</div>
-                </div>
-            </div>
-            <div class="message-content">
-                ${this.createResultPreview(processedContent)}
-                ${this.createMessageActions(role, content, metadata)}
-            </div>
-        `;
-
-        container.appendChild(messageDiv);
-        container.scrollTop = container.scrollHeight;
+   // Simplifier l'affichage des messages pendant l'exécution
+addMessage(role, content, metadata = {}) {
+    // Ne pas afficher les messages intermédiaires pendant l'exécution de tâches
+    if (this.isTaskRunning && role === 'assistant' && !metadata.final) {
+        return;
+    }
+    
+    const container = document.getElementById('messagesContainer');
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    
+    if (welcomeMessage) {
+        welcomeMessage.style.display = 'none';
     }
 
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    const avatarIcon = role === 'user' ? 'U' : 
+                      role === 'assistant' ? 'A' : 'S';
+    
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Traitement amélioré du contenu
+    let processedContent = '';
+    
+    // Si contenu est une chaîne
+    if (typeof content === 'string') {
+        // Vérifier si c'est une erreur et appliquer un style spécial
+        if (content.includes('Error') || content.includes('error')) {
+            processedContent = `<div class="error-message"><i class="fas fa-exclamation-triangle"></i> ${content}</div>`;
+        } else {
+            // Sinon, utiliser le rendu markdown normal
+            processedContent = this.renderMarkdown(content);
+        }
+    } else if (content && typeof content === 'object') {
+        // Si c'est un objet, le convertir en chaîne formatée
+        processedContent = `<pre>${JSON.stringify(content, null, 2)}</pre>`;
+    } else {
+        // Pour tout autre cas
+        processedContent = String(content);
+    }
+
+    messageDiv.innerHTML = `
+        <div class="message-header">
+            <div class="message-avatar">${avatarIcon}</div>
+            <div class="message-info">
+                <div class="message-sender">${role.charAt(0).toUpperCase() + role.slice(1)}</div>
+                <div class="message-time">${timestamp}</div>
+            </div>
+        </div>
+        <div class="message-content">
+            ${this.createResultPreview(processedContent)}
+            ${this.createMessageActions(role, content, metadata)}
+        </div>
+    `;
+
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+    
+    // Log pour debug
+    console.log(`Message ajouté: role=${role}, content=`, content);
+}
     createResultPreview(content) {
         const maxLength = 1000;
         if (content.length > maxLength) {
