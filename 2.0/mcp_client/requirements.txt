@@ -5,3 +5,8 @@ httpx
 google-cloud-logging
 google-cloud-aiplatform
 python-dotenv
+pdfkit
+markdown
+python-multipart
+python-jose[cryptography] 
+passlib[bcrypt]

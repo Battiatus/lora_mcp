@@ -20,6 +20,10 @@ from typing import AsyncIterator, List, Dict, Any, Optional, Tuple, Union
 from dotenv import load_dotenv
 load_dotenv()
 
+import subprocess
+import requests
+from pathlib import Path
+
 import nest_asyncio
 nest_asyncio.apply()
 
@@ -1332,292 +1336,1081 @@ async def download_page_video(index: int, ctx: Context, filename: Optional[str] 
         ctx.error(f"Erreur lors du téléchargement de la vidéo: {str(e)}")
         return {"success": False, "error": str(e)}
 
+# --- TikTok Video Downloader Tools ---
+
 @mcp_host.tool()
-async def download_tiktok_video(url: str, ctx: Context, filename: Optional[str] = None) -> Dict[str, Any]:
-    """Télécharge une vidéo TikTok en évitant les mesures anti-bots
+async def download_tiktok_video_advanced(url: str, ctx: Context, quality: str = "best", include_audio: bool = True) -> Dict[str, Any]:
+    """Télécharge une vidéo TikTok avec Playwright et extraction avancée
     
     Args:
         url: URL de la vidéo TikTok
         ctx: Contexte MCP
-        filename: Nom de fichier optionnel
+        quality: Qualité vidéo souhaitée ('best', 'worst', 'medium')
+        include_audio: Inclure l'audio dans le téléchargement
     
     Returns:
-        Informations sur le téléchargement
+        Informations sur le téléchargement et métadonnées de la vidéo
     """
+    page: Page = ctx.request_context.lifespan_context.page
+    
     try:
-        ctx.info(f"Tentative de téléchargement vidéo TikTok depuis: {url}")
+        ctx.info(f"Téléchargement TikTok avancé: {url}")
         
-        # Vérifier si l'URL est valide
-        if not url or not ('tiktok.com' in url):
+        # Valider l'URL TikTok
+        if not is_valid_tiktok_url(url):
             return {"success": False, "error": "URL TikTok invalide"}
         
-        # Générer un nom de fichier si non fourni
-        if not filename:
-            filename = f"tiktok_video_{int(time.time())}_{uuid.uuid4().hex[:8]}.mp4"
+        # Nettoyer l'URL
+        clean_url = clean_tiktok_url(url)
         
-        # Chemin de sortie
-        output_path = os.path.join(f"videos/{SESSION_ID}", filename)
+        # Créer le dossier de téléchargement
+        download_dir = f"videos/{SESSION_ID}/tiktok"
+        os.makedirs(download_dir, exist_ok=True)
         
-        # Méthode 1: Utiliser yt-dlp (méthode privilégiée pour TikTok)
-        try:
-            ctx.info("Utilisation de yt-dlp pour télécharger la vidéo TikTok")
-            command = [
-                "yt-dlp", 
-                url,
-                "-o", output_path,
-                "--no-playlist",
-                "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                "--merge-output-format", "mp4",
-                # Options spécifiques à TikTok
-                "--cookies-from-browser", "chrome",  # Utiliser les cookies de Chrome si disponibles
-                "--user-agent", random.choice(USER_AGENTS),
-                "--referer", "https://www.tiktok.com/",
-                "--add-header", "Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
-                "--no-check-certificate",  # Ignorer les problèmes de certificats
-                "--force-generic-extractor"  # Forcer l'extracteur générique en cas d'échec
-            ]
-            
-            # Exécuter la commande
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode != 0:
-                error_msg = stderr.decode() if stderr else "Erreur inconnue"
-                ctx.warning(f"Erreur yt-dlp: {error_msg}, tentative avec la méthode 2")
-                # Continuer avec la méthode 2 si yt-dlp échoue
-            else:
-                # Vérifier si le fichier a été créé
-                if os.path.exists(output_path):
-                    file_size = os.path.getsize(output_path)
-                    return {
-                        "success": True, 
-                        "file_path": output_path,
-                        "file_size": file_size,
-                        "file_size_human": f"{file_size / (1024*1024):.2f} MB",
-                        "method": "yt-dlp"
-                    }
-        except Exception as e:
-            ctx.warning(f"Erreur avec yt-dlp: {str(e)}, passage à la méthode alternative")
+        # Étape 1: Navigation avec anti-détection
+        ctx.info("Navigation vers TikTok avec anti-détection...")
+        navigation_result = await navigate_tiktok_with_stealth(page, clean_url, ctx)
         
-        # Méthode 2: Navigation et extraction directe via Playwright
-        ctx.info("Utilisation de Playwright pour extraire la vidéo TikTok")
-        page: Page = ctx.request_context.lifespan_context.page
-        context: BrowserContext = ctx.request_context.lifespan_context.context
+        if not navigation_result["success"]:
+            return {"success": False, "error": navigation_result["error"]}
         
-        # Naviguer vers la page avec anti-détection
-        try:
-            # Ajouter des en-têtes HTTP supplémentaires pour TikTok
-            await page.set_extra_http_headers({
-                'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Cache-Control': 'max-age=0',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                'Pragma': 'no-cache'
-            })
-            
-            # Simuler un comportement humain avant la navigation
-            await emulate_human_behavior(page)
-            
-            # Naviguer vers TikTok
-            ctx.info(f"Navigation vers TikTok: {url}")
-            response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            
-            # Temps d'attente aléatoire comme le ferait un humain
-            await asyncio.sleep(1 + random.random() * 2)
-            
-            # Vérifier si TikTok a affiché un CAPTCHA
-            if (await page.query_selector('iframe[src*="captcha"], iframe[title*="captcha"]') or 
-                await page.query_selector('div[class*="captcha"], div[class*="verify"]')):
-                
-                ctx.info("CAPTCHA TikTok détecté, tentative de résolution...")
-                
-                # D'abord vérifier s'il s'agit d'un puzzle coulissant
-                captcha_result = await solve_tiktok_puzzle_captcha(page, ctx)
-                
-                if not captcha_result.get("solved", False):
-                    # Si le puzzle coulissant échoue, essayer les autres méthodes
-                    captcha_result = await detect_and_solve_captcha(page, ctx)
-                
-                if captcha_result.get("solved", False):
-                    # Captcha résolu, attendre que la page se charge
-                    await asyncio.sleep(2)
-                    await page.wait_for_load_state("networkidle")
-                else:
-                    ctx.warning("Impossible de résoudre le CAPTCHA, tentative d'extraction quand même")
-            
-            # Attendre le chargement complet
-            await page.wait_for_load_state("networkidle")
-            
-            # Faire défiler lentement pour déclencher le chargement de la vidéo
-            for _ in range(random.randint(1, 3)):
-                await page.mouse.wheel(0, random.randint(100, 200))
-                await asyncio.sleep(random.uniform(0.5, 1.0))
-            
-            # Essayer d'extraire la vidéo directement de la page
-
-            video_data = await page.evaluate(r"""() => {
-                // Chercher l'URL de la vidéo dans différents éléments et attributs
-                
-                // Méthode 1: Chercher les éléments vidéo directs
-                const videoElements = document.querySelectorAll('video');
-                for (const video of videoElements) {
-                    if (video.src && video.src.includes('.mp4')) {
-                        return { url: video.src, method: 'video_element' };
-                    }
-                    
-                    // Vérifier les sources
-                    const sources = video.querySelectorAll('source');
-                    for (const source of sources) {
-                        if (source.src && source.src.includes('.mp4')) {
-                            return { url: source.src, method: 'video_source' };
-                        }
-                    }
-                }
-                
-                // Méthode 2: Chercher dans le contenu JSON de la page
-                try {
-                    const scripts = document.querySelectorAll('script');
-                    for (const script of scripts) {
-                        const content = script.textContent || '';
-                        if (content.includes('playAddr') || content.includes('downloadAddr')) {
-                            // Trouver l'URL de la vidéo dans le JSON
-                            const playAddrMatch = content.match(/"playAddr":"([^"]+)"/);
-                            const downloadAddrMatch = content.match(/"downloadAddr":"([^"]+)"/);
-                            
-                            if (playAddrMatch && playAddrMatch[1]) {
-                                return { 
-                                    url: playAddrMatch[1].replace(/\\u002F/g, '/'), 
-                                    method: 'json_playAddr' 
-                                };
-                            }
-                            
-                            if (downloadAddrMatch && downloadAddrMatch[1]) {
-                                return { 
-                                    url: downloadAddrMatch[1].replace(/\\u002F/g, '/'), 
-                                    method: 'json_downloadAddr' 
-                                };
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error('Erreur lors de l\'analyse JSON:', e);
-                }
-                
-                // Méthode 3: Chercher les URLs de vidéo dans le HTML
-                const html = document.documentElement.innerHTML;
-                const videoUrlMatches = html.match(/https?:\/\/[^\s"']+\.mp4[^\s"']*/g);
-                if (videoUrlMatches && videoUrlMatches.length > 0) {
-                    return { url: videoUrlMatches[0], method: 'html_regex' };
-                }
-                
-                return null;
-            }""")
-
-            if video_data and video_data.get('url'):
-                video_url = video_data.get('url')
-                method = video_data.get('method', 'unknown')
-                ctx.info(f"URL vidéo trouvée par {method}: {video_url[:50]}...")
-                
-                # Télécharger la vidéo
-                async with httpx.AsyncClient(follow_redirects=True) as client:
-                    headers = {
-                        'User-Agent': random.choice(USER_AGENTS),
-                        'Referer': 'https://www.tiktok.com/',
-                        'Accept': '*/*',
-                        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-                        'Range': 'bytes=0-'  # Pour les téléchargements partiels
-                    }
-                    
-                    response = await client.get(video_url, headers=headers)
-                    
-                    if response.status_code in (200, 206):  # OK ou Partial Content
-                        # Écrire le fichier
-                        with open(output_path, "wb") as f:
-                            f.write(response.content)
-                        
-                        file_size = os.path.getsize(output_path)
-                        return {
-                            "success": True, 
-                            "file_path": output_path,
-                            "file_size": file_size,
-                            "file_size_human": f"{file_size / (1024*1024):.2f} MB",
-                            "method": f"direct_extraction_{method}"
-                        }
-                    else:
-                        ctx.error(f"Échec du téléchargement direct: {response.status_code}")
-        except Exception as e:
-            ctx.error(f"Erreur lors de l'extraction via Playwright: {str(e)}")
+        # Étape 2: Extraction des métadonnées
+        ctx.info("Extraction des métadonnées de la vidéo...")
+        metadata = await extract_tiktok_metadata(page, ctx)
         
-        # Méthode 3: Utiliser l'API TikTok sans clé
-        try:
-            ctx.info("Tentative via l'API TikTok sans clé")
-            
-            # Extraire l'ID de la vidéo de l'URL
-            video_id_match = re.search(r'/video/(\d+)', url)
-            if not video_id_match:
-                return {"success": False, "error": "Impossible d'extraire l'ID de la vidéo TikTok"}
-            
-            video_id = video_id_match.group(1)
-            api_url = f"https://api16-normal-c-useast1a.tiktokv.com/aweme/v1/feed/?aweme_id={video_id}"
-            
-            async with httpx.AsyncClient() as client:
-                headers = {
-                    'User-Agent': 'TikTok 26.2.0 rv:262018 (iPhone; iOS 14.4.2; en_US) Cronet',
-                    'Accept': 'application/json',
-                }
-                
-                response = await client.get(api_url, headers=headers)
-                
-                if response.status_code == 200:
-                    try:
-                        json_data = response.json()
-                        aweme_list = json_data.get('aweme_list', [])
-                        
-                        if aweme_list and len(aweme_list) > 0:
-                            # Extraire l'URL de la vidéo
-                            video_info = aweme_list[0]
-                            if 'video' in video_info and 'play_addr' in video_info['video']:
-                                play_addr = video_info['video']['play_addr']
-                                video_url = play_addr.get('url_list', [])[0]
-                                
-                                if video_url:
-                                    # Télécharger la vidéo
-                                    dl_response = await client.get(video_url)
-                                    
-                                    if dl_response.status_code == 200:
-                                        with open(output_path, "wb") as f:
-                                            f.write(dl_response.content)
-                                        
-                                        file_size = os.path.getsize(output_path)
-                                        return {
-                                            "success": True, 
-                                            "file_path": output_path,
-                                            "file_size": file_size,
-                                            "file_size_human": f"{file_size / (1024*1024):.2f} MB",
-                                            "method": "tiktok_api"
-                                        }
-                    except Exception as e:
-                        ctx.error(f"Erreur lors du traitement de la réponse API: {str(e)}")
-        except Exception as e:
-            ctx.error(f"Erreur lors de l'utilisation de l'API TikTok: {str(e)}")
+        # Étape 3: Extraction de l'URL de la vidéo
+        ctx.info("Extraction de l'URL de la vidéo...")
+        video_urls = await extract_tiktok_video_urls(page, ctx)
         
-        # Si toutes les méthodes échouent
-        return {"success": False, "error": "Impossible de télécharger la vidéo avec toutes les méthodes disponibles"}
+        if not video_urls:
+            return {"success": False, "error": "Impossible d'extraire les URLs de la vidéo"}
+        
+        # Étape 4: Sélection de la meilleure qualité
+        selected_url = select_best_quality_url(video_urls, quality)
+        
+        # Étape 5: Téléchargement de la vidéo
+        ctx.info("Téléchargement de la vidéo...")
+        filename = generate_tiktok_filename(metadata, clean_url)
+        download_result = await download_video_file(selected_url, download_dir, filename, ctx)
+        
+        if not download_result["success"]:
+            return {"success": False, "error": download_result["error"]}
+        
+        # Étape 6: Post-traitement (si nécessaire)
+        final_path = download_result["file_path"]
+        if not include_audio:
+            ctx.info("Suppression de l'audio...")
+            final_path = await remove_audio_from_video(download_result["file_path"], ctx)
+        
+        # Étape 7: Génération de la miniature
+        thumbnail_path = await generate_video_thumbnail(final_path, ctx)
+        
+        return {
+            "success": True,
+            "file_path": final_path,
+            "thumbnail_path": thumbnail_path,
+            "metadata": metadata,
+            "file_size": os.path.getsize(final_path),
+            "file_size_human": format_file_size(os.path.getsize(final_path)),
+            "duration": metadata.get("duration", "Unknown"),
+            "quality": quality,
+            "include_audio": include_audio,
+            "download_method": "playwright_advanced"
+        }
         
     except Exception as e:
-        ctx.error(f"Erreur lors du téléchargement de la vidéo TikTok: {str(e)}")
+        ctx.error(f"Erreur lors du téléchargement TikTok: {str(e)}")
         return {"success": False, "error": str(e)}
+
+async def navigate_tiktok_with_stealth(page: Page, url: str, ctx: Context) -> Dict[str, Any]:
+    """Navigation TikTok avec techniques de camouflage avancées"""
+    try:
+        # Configuration des en-têtes HTTP avancés
+        await page.set_extra_http_headers({
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Cache-Control': 'max-age=0',
+            'Sec-Ch-Ua': '"Chromium";v="120", "Google Chrome";v="120", "Not:A-Brand";v="99"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': random.choice(USER_AGENTS)
+        })
+        
+        # Injection de scripts anti-détection spécifiques à TikTok
+        await page.add_init_script("""
+        // Script anti-détection TikTok avancé
+        (() => {
+            // Masquer WebDriver
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+                configurable: true
+            });
+            
+            // Simuler un navigateur réel
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [
+                    { name: 'Chrome PDF Plugin', description: 'Portable Document Format', filename: 'internal-pdf-viewer' },
+                    { name: 'Chrome PDF Viewer', description: '', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                    { name: 'Native Client', description: '', filename: 'internal-nacl-plugin' }
+                ]
+            });
+            
+            // Masquer les traces de Playwright
+            delete window.playwright;
+            delete window.__playwright;
+            delete window.__pw_manual;
+            
+            // TikTok spécifique - Simuler les objets attendus
+            window.TiktokAnalyticsObject = 'ttq';
+            window.ttq = window.ttq || [];
+            
+            // Simuler les événements de souris pour TikTok
+            let mouseEvents = ['mousedown', 'mouseup', 'mousemove', 'click'];
+            mouseEvents.forEach(eventType => {
+                document.addEventListener(eventType, (e) => {
+                    window.lastMouseEvent = {
+                        type: eventType,
+                        timestamp: Date.now(),
+                        x: e.clientX,
+                        y: e.clientY
+                    };
+                }, true);
+            });
+            
+            // Simuler l'activité utilisateur
+            setInterval(() => {
+                window.dispatchEvent(new Event('user-activity'));
+            }, 1000 + Math.random() * 2000);
+            
+            // Overrider les fonctions de détection communes
+            const originalToString = Function.prototype.toString;
+            Function.prototype.toString = function() {
+                if (this.name === 'webdriver' || this.name === 'driver') {
+                    return 'function webdriver() { [native code] }';
+                }
+                return originalToString.call(this);
+            };
+        })();
+        """)
+        
+        # Navigation avec retry en cas d'échec
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                ctx.info(f"Tentative de navigation {attempt + 1}/{max_retries}")
+                
+                # Simuler un comportement humain avant navigation
+                await asyncio.sleep(random.uniform(1, 3))
+                
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                
+                # Attendre que la page soit stable
+                await page.wait_for_load_state("networkidle", timeout=30000)
+                
+                # Vérifier si on a été redirigé vers une page d'erreur
+                current_url = page.url
+                if "error" in current_url.lower() or "not-found" in current_url.lower():
+                    raise Exception("Page d'erreur détectée")
+                
+                # Simuler l'activité utilisateur
+                await simulate_user_activity(page, ctx)
+                
+                # Vérifier la présence de CAPTCHA
+                captcha_detected = await detect_tiktok_captcha(page, ctx)
+                if captcha_detected:
+                    ctx.info("CAPTCHA détecté, tentative de résolution...")
+                    captcha_solved = await solve_tiktok_captcha(page, ctx)
+                    if not captcha_solved:
+                        if attempt < max_retries - 1:
+                            ctx.warning("CAPTCHA non résolu, nouvelle tentative...")
+                            await asyncio.sleep(5)
+                            continue
+                        else:
+                            return {"success": False, "error": "CAPTCHA non résolu après plusieurs tentatives"}
+                
+                # Vérifier que la vidéo est chargée
+                video_loaded = await wait_for_video_load(page, ctx)
+                if not video_loaded:
+                    if attempt < max_retries - 1:
+                        ctx.warning("Vidéo non chargée, nouvelle tentative...")
+                        await asyncio.sleep(3)
+                        continue
+                    else:
+                        return {"success": False, "error": "Vidéo non chargée après plusieurs tentatives"}
+                
+                return {"success": True, "url": current_url}
+                
+            except Exception as e:
+                ctx.warning(f"Tentative {attempt + 1} échouée: {str(e)}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                else:
+                    return {"success": False, "error": f"Navigation échouée après {max_retries} tentatives: {str(e)}"}
+        
+    except Exception as e:
+        return {"success": False, "error": f"Erreur de navigation: {str(e)}"}
+
+async def simulate_user_activity(page: Page, ctx: Context):
+    """Simuler une activité utilisateur réaliste"""
+    try:
+        # Mouvements de souris aléatoires
+        for _ in range(random.randint(3, 7)):
+            x = random.randint(100, 1800)
+            y = random.randint(100, 900)
+            await page.mouse.move(x, y)
+            await asyncio.sleep(random.uniform(0.1, 0.5))
+        
+        # Scroll aléatoire
+        for _ in range(random.randint(1, 3)):
+            await page.mouse.wheel(0, random.randint(-200, 200))
+            await asyncio.sleep(random.uniform(0.5, 1.5))
+        
+        # Pause pour simuler la lecture
+        await asyncio.sleep(random.uniform(2, 5))
+        
+    except Exception as e:
+        ctx.warning(f"Erreur lors de la simulation d'activité: {str(e)}")
+
+async def detect_tiktok_captcha(page: Page, ctx: Context) -> bool:
+    """Détecter la présence d'un CAPTCHA TikTok"""
+    try:
+        captcha_selectors = [
+            'iframe[src*="captcha"]',
+            'div[class*="captcha"]',
+            'div[class*="verify"]',
+            '.captcha_verify_container',
+            '.secsdk-captcha-wrapper',
+            '[data-testid="captcha"]'
+        ]
+        
+        for selector in captcha_selectors:
+            element = await page.query_selector(selector)
+            if element and await element.is_visible():
+                return True
+        
+        return False
+    except Exception:
+        return False
+
+async def solve_tiktok_captcha(page: Page, ctx: Context) -> bool:
+    """Résoudre le CAPTCHA TikTok"""
+    try:
+        # Utiliser la fonction existante
+        captcha_result = await solve_tiktok_puzzle_captcha(page, ctx)
+        return captcha_result.get("solved", False)
+    except Exception as e:
+        ctx.error(f"Erreur lors de la résolution du CAPTCHA: {str(e)}")
+        return False
+
+async def wait_for_video_load(page: Page, ctx: Context) -> bool:
+    """Attendre que la vidéo soit chargée"""
+    try:
+        # Attendre la présence d'éléments vidéo
+        await page.wait_for_selector('video', timeout=30000)
+        
+        # Vérifier que la vidéo a des données
+        video_data = await page.evaluate("""
+        () => {
+            const videos = document.querySelectorAll('video');
+            for (const video of videos) {
+                if (video.src || video.currentSrc) {
+                    return {
+                        found: true,
+                        src: video.src || video.currentSrc,
+                        duration: video.duration,
+                        readyState: video.readyState
+                    };
+                }
+            }
+            return { found: false };
+        }
+        """)
+        
+        return video_data.get("found", False)
+    except Exception as e:
+        ctx.warning(f"Erreur lors de l'attente de chargement vidéo: {str(e)}")
+        return False
+
+async def extract_tiktok_metadata(page: Page, ctx: Context) -> Dict[str, Any]:
+    """Extraire les métadonnées de la vidéo TikTok"""
+    try:
+        metadata = await page.evaluate("""
+        () => {
+            const data = {};
+            
+            // Extraire depuis les meta tags
+            const metaTags = document.querySelectorAll('meta');
+            metaTags.forEach(tag => {
+                const property = tag.getAttribute('property') || tag.getAttribute('name');
+                const content = tag.getAttribute('content');
+                
+                if (property && content) {
+                    if (property.includes('title') || property.includes('description')) {
+                        data[property] = content;
+                    }
+                }
+            });
+            
+            // Extraire depuis les scripts JSON-LD
+            const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+            scripts.forEach(script => {
+                try {
+                    const json = JSON.parse(script.textContent);
+                    if (json['@type'] === 'VideoObject') {
+                        data.title = json.name || data.title;
+                        data.description = json.description || data.description;
+                        data.duration = json.duration;
+                        data.uploadDate = json.uploadDate;
+                        data.author = json.author?.name;
+                    }
+                } catch (e) {}
+            });
+            
+            // Extraire depuis les éléments de la page
+            const titleElement = document.querySelector('[data-e2e="browse-video-desc"]') || 
+                                document.querySelector('h1') || 
+                                document.querySelector('[data-testid="video-title"]');
+            if (titleElement) {
+                data.title = titleElement.textContent?.trim() || data.title;
+            }
+            
+            const authorElement = document.querySelector('[data-e2e="browse-username"]') ||
+                                 document.querySelector('[data-testid="author-name"]');
+            if (authorElement) {
+                data.author = authorElement.textContent?.trim() || data.author;
+            }
+            
+            // Extraire les informations vidéo
+            const video = document.querySelector('video');
+            if (video) {
+                data.videoWidth = video.videoWidth;
+                data.videoHeight = video.videoHeight;
+                data.duration = video.duration || data.duration;
+            }
+            
+            return data;
+        }
+        """)
+        
+        return metadata
+    except Exception as e:
+        ctx.warning(f"Erreur lors de l'extraction des métadonnées: {str(e)}")
+        return {}
+
+async def extract_tiktok_video_urls(page: Page, ctx: Context) -> List[Dict[str, Any]]:
+    """Extraire les URLs de la vidéo TikTok"""
+    try:
+        video_urls = await page.evaluate("""
+        () => {
+            const urls = [];
+            
+            // Méthode 1: Éléments vidéo directs
+            const videos = document.querySelectorAll('video');
+            videos.forEach((video, index) => {
+                if (video.src) {
+                    urls.push({
+                        url: video.src,
+                        quality: 'unknown',
+                        type: 'direct',
+                        source: `video_element_${index}`
+                    });
+                }
+                
+                // Sources multiples
+                const sources = video.querySelectorAll('source');
+                sources.forEach((source, sourceIndex) => {
+                    if (source.src) {
+                        urls.push({
+                            url: source.src,
+                            quality: source.getAttribute('data-quality') || 'unknown',
+                            type: 'source',
+                            source: `video_source_${index}_${sourceIndex}`
+                        });
+                    }
+                });
+            });
+            
+            // Méthode 2: Scripts et données JSON
+            const scripts = document.querySelectorAll('script');
+            scripts.forEach((script, index) => {
+                const content = script.textContent || '';
+                
+                // Recherche des URLs de vidéo dans le contenu
+                const videoUrlPatterns = [
+                    /["']playAddr["']:\s*["']([^"']+)["']/g,
+                    /["']downloadAddr["']:\s*["']([^"']+)["']/g,
+                    /["']url["']:\s*["']([^"']+\.mp4[^"']*)["']/g,
+                    /https:\/\/[^"'\s]+\.mp4[^"'\s]*/g
+                ];
+                
+                videoUrlPatterns.forEach(pattern => {
+                    const matches = content.matchAll(pattern);
+                    for (const match of matches) {
+                        let url = match[1] || match[0];
+                        if (url && url.includes('.mp4')) {
+                            // Nettoyer l'URL
+                            url = url.replace(/\\u002F/g, '/').replace(/\\/g, '');
+                            urls.push({
+                                url: url,
+                                quality: 'unknown',
+                                type: 'script_extracted',
+                                source: `script_${index}`
+                            });
+                        }
+                    }
+                });
+            });
+            
+            // Méthode 3: API calls interceptées (si disponibles)
+            if (window.tiktokVideoUrls) {
+                window.tiktokVideoUrls.forEach((url, index) => {
+                    urls.push({
+                        url: url,
+                        quality: 'api',
+                        type: 'intercepted',
+                        source: `api_${index}`
+                    });
+                });
+            }
+            
+            // Dédupliquer les URLs
+            const uniqueUrls = [];
+            const seen = new Set();
+            
+            urls.forEach(item => {
+                if (!seen.has(item.url)) {
+                    seen.add(item.url);
+                    uniqueUrls.push(item);
+                }
+            });
+            
+            return uniqueUrls;
+        }
+        """)
+        
+        # Filtrer et valider les URLs
+        valid_urls = []
+        for url_data in video_urls:
+            url = url_data.get("url", "")
+            if url and is_valid_video_url(url):
+                valid_urls.append(url_data)
+        
+        return valid_urls
+        
+    except Exception as e:
+        ctx.error(f"Erreur lors de l'extraction des URLs vidéo: {str(e)}")
+        return []
+
+def select_best_quality_url(video_urls: List[Dict[str, Any]], quality_preference: str) -> str:
+    """Sélectionner la meilleure URL selon la préférence de qualité"""
+    if not video_urls:
+        return None
+    
+    # Priorités par type de source
+    source_priority = {
+        'direct': 3,
+        'source': 2,
+        'script_extracted': 1,
+        'intercepted': 4
+    }
+    
+    # Trier par priorité de source
+    sorted_urls = sorted(video_urls, key=lambda x: source_priority.get(x.get('type', ''), 0), reverse=True)
+    
+    if quality_preference == "best":
+        return sorted_urls[0]["url"]
+    elif quality_preference == "worst":
+        return sorted_urls[-1]["url"]
+    else:  # medium
+        mid_index = len(sorted_urls) // 2
+        return sorted_urls[mid_index]["url"]
+
+async def download_video_file(url: str, download_dir: str, filename: str, ctx: Context) -> Dict[str, Any]:
+    """Télécharger le fichier vidéo"""
+    try:
+        file_path = os.path.join(download_dir, filename)
+        
+        # En-têtes pour le téléchargement
+        headers = {
+            'User-Agent': random.choice(USER_AGENTS),
+            'Referer': 'https://www.tiktok.com/',
+            'Accept': '*/*',
+            'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'video',
+            'Sec-Fetch-Mode': 'no-cors',
+            'Sec-Fetch-Site': 'cross-site',
+            'Range': 'bytes=0-'
+        }
+        
+        async with httpx.AsyncClient(follow_redirects=True, timeout=300) as client:
+            response = await client.get(url, headers=headers)
+            
+            if response.status_code in [200, 206]:
+                with open(file_path, 'wb') as f:
+                    f.write(response.content)
+                
+                return {
+                    "success": True,
+                    "file_path": file_path,
+                    "file_size": len(response.content)
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Échec du téléchargement: HTTP {response.status_code}"
+                }
+                
+    except Exception as e:
+        return {"success": False, "error": f"Erreur de téléchargement: {str(e)}"}
+
+async def remove_audio_from_video(video_path: str, ctx: Context) -> str:
+    """Supprimer l'audio d'une vidéo avec ffmpeg"""
+    try:
+        output_path = video_path.replace('.mp4', '_no_audio.mp4')
+        
+        command = [
+            'ffmpeg',
+            '-i', video_path,
+            '-c:v', 'copy',
+            '-an',  # Supprimer l'audio
+            '-y',   # Overwrite output file
+            output_path
+        ]
+        
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode == 0:
+            # Supprimer le fichier original
+            os.remove(video_path)
+            return output_path
+        else:
+            ctx.warning(f"Échec de la suppression audio: {stderr.decode()}")
+            return video_path
+            
+    except Exception as e:
+        ctx.warning(f"Erreur lors de la suppression audio: {str(e)}")
+        return video_path
+
+async def generate_video_thumbnail(video_path: str, ctx: Context) -> str:
+    """Générer une miniature de la vidéo"""
+    try:
+        thumbnail_path = video_path.replace('.mp4', '_thumbnail.jpg')
+        
+        command = [
+            'ffmpeg',
+            '-i', video_path,
+            '-ss', '00:00:01',  # Prendre la frame à 1 seconde
+            '-vframes', '1',    # Une seule frame
+            '-y',               # Overwrite
+            thumbnail_path
+        ]
+        
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode == 0:
+            return thumbnail_path
+        else:
+            ctx.warning(f"Échec de la génération de miniature: {stderr.decode()}")
+            return None
+            
+    except Exception as e:
+        ctx.warning(f"Erreur lors de la génération de miniature: {str(e)}")
+        return None
+
+# --- Fonctions utilitaires ---
+
+def is_valid_tiktok_url(url: str) -> bool:
+    """Vérifier si l'URL est une URL TikTok valide"""
+    tiktok_patterns = [
+        r'https?://(?:www\.)?tiktok\.com/@[\w.-]+/video/\d+',
+        r'https?://(?:www\.)?tiktok\.com/t/[\w-]+',
+        r'https?://vm\.tiktok\.com/[\w-]+',
+        r'https?://(?:www\.)?tiktok\.com/embed/v2/\d+',
+    ]
+    
+    return any(re.match(pattern, url) for pattern in tiktok_patterns)
+
+def clean_tiktok_url(url: str) -> str:
+    """Nettoyer et normaliser l'URL TikTok"""
+    # Supprimer les paramètres de tracking
+    parsed = urlparse(url)
+    clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    
+    # Convertir les URLs courtes
+    if 'vm.tiktok.com' in url or '/t/' in url:
+        # Ces URLs nécessitent une redirection, on les laisse telles quelles
+        return url
+    
+    return clean_url
+
+def is_valid_video_url(url: str) -> bool:
+    """Vérifier si l'URL est une URL vidéo valide"""
+    if not url or not isinstance(url, str):
+        return False
+    
+    # Vérifier le format de base
+    if not url.startswith(('http://', 'https://')):
+        return False
+    
+    # Vérifier l'extension ou le type
+    video_indicators = ['.mp4', '.webm', '.m4v', 'video', 'stream']
+    return any(indicator in url.lower() for indicator in video_indicators)
+
+def generate_tiktok_filename(metadata: Dict[str, Any], url: str) -> str:
+    """Générer un nom de fichier pour la vidéo TikTok"""
+    # Extraire l'ID de la vidéo de l'URL
+    video_id_match = re.search(r'/video/(\d+)', url)
+    video_id = video_id_match.group(1) if video_id_match else str(uuid.uuid4())[:8]
+    
+    # Nettoyer le titre si disponible
+    title = metadata.get('title', '')
+    if title:
+        # Nettoyer le titre pour le nom de fichier
+        title = re.sub(r'[^\w\s-]', '', title)[:50]
+        title = re.sub(r'\s+', '_', title)
+        return f"tiktok_{video_id}_{title}.mp4"
+    
+    # Nom par défaut
+    return f"tiktok_{video_id}_{int(time.time())}.mp4"
+
+def format_file_size(size_bytes: int) -> str:
+    """Formater la taille de fichier en format lisible"""
+    if size_bytes == 0:
+        return "0 B"
+    
+    size_names = ["B", "KB", "MB", "GB"]
+    i = 0
+    while size_bytes >= 1024 and i < len(size_names) - 1:
+        size_bytes /= 1024.0
+        i += 1
+    
+    return f"{size_bytes:.2f} {size_names[i]}"
+
+# --- Outil pour lister les vidéos TikTok d'un profil ---
+
+@mcp_host.tool()
+async def get_tiktok_profile_videos(username: str, ctx: Context, limit: int = 10) -> Dict[str, Any]:
+    """Récupérer la liste des vidéos d'un profil TikTok
+    
+    Args:
+        username: Nom d'utilisateur TikTok (sans @)
+        ctx: Contexte MCP
+        limit: Nombre maximum de vidéos à récupérer
+    
+    Returns:
+        Liste des vidéos du profil avec métadonnées
+    """
+    page: Page = ctx.request_context.lifespan_context.page
+    
+    try:
+        ctx.info(f"Récupération des vidéos du profil @{username}")
+        
+        # Construire l'URL du profil
+        profile_url = f"https://www.tiktok.com/@{username}"
+        
+        # Navigation vers le profil
+        navigation_result = await navigate_tiktok_with_stealth(page, profile_url, ctx)
+        if not navigation_result["success"]:
+            return {"success": False, "error": navigation_result["error"]}
+        
+        # Attendre le chargement des vidéos
+        await page.wait_for_selector('[data-e2e="user-post-item"]', timeout=30000)
+        
+        # Extraire les informations des vidéos
+        videos_data = await page.evaluate(f"""
+        (limit) => {{
+            const videos = [];
+            const videoElements = document.querySelectorAll('[data-e2e="user-post-item"]');
+            
+            for (let i = 0; i < Math.min(videoElements.length, limit); i++) {{
+                const element = videoElements[i];
+                const linkElement = element.querySelector('a');
+                
+                if (linkElement) {{
+                    const href = linkElement.href;
+                    const img = element.querySelector('img');
+                    const playCount = element.querySelector('[data-e2e="video-views"]');
+                    
+                    videos.push({{
+                        url: href,
+                        thumbnail: img ? img.src : null,
+                        views: playCount ? playCount.textContent : null,
+                        index: i
+                    }});
+                }}
+            }}
+            
+            return videos;
+        }}
+        """, limit)
+        
+        return {
+            "success": True,
+            "username": username,
+            "profile_url": profile_url,
+            "videos": videos_data,
+            "count": len(videos_data)
+        }
+        
+    except Exception as e:
+        ctx.error(f"Erreur lors de la récupération du profil: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+# --- Outil pour télécharger plusieurs vidéos ---
+
+@mcp_host.tool()
+async def download_multiple_tiktok_videos(urls: List[str], ctx: Context, quality: str = "best") -> Dict[str, Any]:
+    """Télécharger plusieurs vidéos TikTok en lot
+    
+    Args:
+        urls: Liste des URLs TikTok à télécharger
+        ctx: Contexte MCP
+        quality: Qualité vidéo souhaitée
+    
+    Returns:
+        Résultats du téléchargement en lot
+    """
+    try:
+        ctx.info(f"Téléchargement en lot de {len(urls)} vidéos TikTok")
+        
+        results = []
+        success_count = 0
+        
+        for i, url in enumerate(urls):
+            ctx.info(f"Téléchargement {i+1}/{len(urls)}: {url}")
+            
+            result = await download_tiktok_video_advanced(url, ctx, quality)
+            results.append({
+                "url": url,
+                "index": i,
+                "result": result
+            })
+            
+            if result.get("success", False):
+                success_count += 1
+            
+            # Pause entre les téléchargements pour éviter le rate limiting
+            await asyncio.sleep(random.uniform(2, 5))
+        
+        return {
+            "success": True,
+            "total_videos": len(urls),
+            "successful_downloads": success_count,
+            "failed_downloads": len(urls) - success_count,
+            "results": results
+        }
+        
+    except Exception as e:
+        ctx.error(f"Erreur lors du téléchargement en lot: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+# @mcp_host.tool()
+# async def download_tiktok_video(url: str, ctx: Context, filename: Optional[str] = None) -> Dict[str, Any]:
+#     """Télécharge une vidéo TikTok en évitant les mesures anti-bots
+    
+#     Args:
+#         url: URL de la vidéo TikTok
+#         ctx: Contexte MCP
+#         filename: Nom de fichier optionnel
+    
+#     Returns:
+#         Informations sur le téléchargement
+#     """
+#     try:
+#         ctx.info(f"Tentative de téléchargement vidéo TikTok depuis: {url}")
+        
+#         # Vérifier si l'URL est valide
+#         if not url or not ('tiktok.com' in url):
+#             return {"success": False, "error": "URL TikTok invalide"}
+        
+#         # Générer un nom de fichier si non fourni
+#         if not filename:
+#             filename = f"tiktok_video_{int(time.time())}_{uuid.uuid4().hex[:8]}.mp4"
+        
+#         # Chemin de sortie
+#         output_path = os.path.join(f"videos/{SESSION_ID}", filename)
+        
+#         # Méthode 1: Utiliser yt-dlp (méthode privilégiée pour TikTok)
+#         try:
+#             ctx.info("Utilisation de yt-dlp pour télécharger la vidéo TikTok")
+#             command = [
+#                 "yt-dlp", 
+#                 url,
+#                 "-o", output_path,
+#                 "--no-playlist",
+#                 "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+#                 "--merge-output-format", "mp4",
+#                 # Options spécifiques à TikTok
+#                 "--cookies-from-browser", "chrome",  # Utiliser les cookies de Chrome si disponibles
+#                 "--user-agent", random.choice(USER_AGENTS),
+#                 "--referer", "https://www.tiktok.com/",
+#                 "--add-header", "Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+#                 "--no-check-certificate",  # Ignorer les problèmes de certificats
+#                 "--force-generic-extractor"  # Forcer l'extracteur générique en cas d'échec
+#             ]
+            
+#             # Exécuter la commande
+#             process = await asyncio.create_subprocess_exec(
+#                 *command,
+#                 stdout=asyncio.subprocess.PIPE,
+#                 stderr=asyncio.subprocess.PIPE
+#             )
+            
+#             stdout, stderr = await process.communicate()
+            
+#             if process.returncode != 0:
+#                 error_msg = stderr.decode() if stderr else "Erreur inconnue"
+#                 ctx.warning(f"Erreur yt-dlp: {error_msg}, tentative avec la méthode 2")
+#                 # Continuer avec la méthode 2 si yt-dlp échoue
+#             else:
+#                 # Vérifier si le fichier a été créé
+#                 if os.path.exists(output_path):
+#                     file_size = os.path.getsize(output_path)
+#                     return {
+#                         "success": True, 
+#                         "file_path": output_path,
+#                         "file_size": file_size,
+#                         "file_size_human": f"{file_size / (1024*1024):.2f} MB",
+#                         "method": "yt-dlp"
+#                     }
+#         except Exception as e:
+#             ctx.warning(f"Erreur avec yt-dlp: {str(e)}, passage à la méthode alternative")
+        
+#         # Méthode 2: Navigation et extraction directe via Playwright
+#         ctx.info("Utilisation de Playwright pour extraire la vidéo TikTok")
+#         page: Page = ctx.request_context.lifespan_context.page
+#         context: BrowserContext = ctx.request_context.lifespan_context.context
+        
+#         # Naviguer vers la page avec anti-détection
+#         try:
+#             # Ajouter des en-têtes HTTP supplémentaires pour TikTok
+#             await page.set_extra_http_headers({
+#                 'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+#                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+#                 'Accept-Encoding': 'gzip, deflate, br',
+#                 'Cache-Control': 'max-age=0',
+#                 'Connection': 'keep-alive',
+#                 'Upgrade-Insecure-Requests': '1',
+#                 'Sec-Fetch-Dest': 'document',
+#                 'Sec-Fetch-Mode': 'navigate',
+#                 'Sec-Fetch-Site': 'none',
+#                 'Sec-Fetch-User': '?1',
+#                 'Pragma': 'no-cache'
+#             })
+            
+#             # Simuler un comportement humain avant la navigation
+#             await emulate_human_behavior(page)
+            
+#             # Naviguer vers TikTok
+#             ctx.info(f"Navigation vers TikTok: {url}")
+#             response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            
+#             # Temps d'attente aléatoire comme le ferait un humain
+#             await asyncio.sleep(1 + random.random() * 2)
+            
+#             # Vérifier si TikTok a affiché un CAPTCHA
+#             if (await page.query_selector('iframe[src*="captcha"], iframe[title*="captcha"]') or 
+#                 await page.query_selector('div[class*="captcha"], div[class*="verify"]')):
+                
+#                 ctx.info("CAPTCHA TikTok détecté, tentative de résolution...")
+                
+#                 # D'abord vérifier s'il s'agit d'un puzzle coulissant
+#                 captcha_result = await solve_tiktok_puzzle_captcha(page, ctx)
+                
+#                 if not captcha_result.get("solved", False):
+#                     # Si le puzzle coulissant échoue, essayer les autres méthodes
+#                     captcha_result = await detect_and_solve_captcha(page, ctx)
+                
+#                 if captcha_result.get("solved", False):
+#                     # Captcha résolu, attendre que la page se charge
+#                     await asyncio.sleep(2)
+#                     await page.wait_for_load_state("networkidle")
+#                 else:
+#                     ctx.warning("Impossible de résoudre le CAPTCHA, tentative d'extraction quand même")
+            
+#             # Attendre le chargement complet
+#             await page.wait_for_load_state("networkidle")
+            
+#             # Faire défiler lentement pour déclencher le chargement de la vidéo
+#             for _ in range(random.randint(1, 3)):
+#                 await page.mouse.wheel(0, random.randint(100, 200))
+#                 await asyncio.sleep(random.uniform(0.5, 1.0))
+            
+#             # Essayer d'extraire la vidéo directement de la page
+
+#             video_data = await page.evaluate(r"""() => {
+#                 // Chercher l'URL de la vidéo dans différents éléments et attributs
+                
+#                 // Méthode 1: Chercher les éléments vidéo directs
+#                 const videoElements = document.querySelectorAll('video');
+#                 for (const video of videoElements) {
+#                     if (video.src && video.src.includes('.mp4')) {
+#                         return { url: video.src, method: 'video_element' };
+#                     }
+                    
+#                     // Vérifier les sources
+#                     const sources = video.querySelectorAll('source');
+#                     for (const source of sources) {
+#                         if (source.src && source.src.includes('.mp4')) {
+#                             return { url: source.src, method: 'video_source' };
+#                         }
+#                     }
+#                 }
+                
+#                 // Méthode 2: Chercher dans le contenu JSON de la page
+#                 try {
+#                     const scripts = document.querySelectorAll('script');
+#                     for (const script of scripts) {
+#                         const content = script.textContent || '';
+#                         if (content.includes('playAddr') || content.includes('downloadAddr')) {
+#                             // Trouver l'URL de la vidéo dans le JSON
+#                             const playAddrMatch = content.match(/"playAddr":"([^"]+)"/);
+#                             const downloadAddrMatch = content.match(/"downloadAddr":"([^"]+)"/);
+                            
+#                             if (playAddrMatch && playAddrMatch[1]) {
+#                                 return { 
+#                                     url: playAddrMatch[1].replace(/\\u002F/g, '/'), 
+#                                     method: 'json_playAddr' 
+#                                 };
+#                             }
+                            
+#                             if (downloadAddrMatch && downloadAddrMatch[1]) {
+#                                 return { 
+#                                     url: downloadAddrMatch[1].replace(/\\u002F/g, '/'), 
+#                                     method: 'json_downloadAddr' 
+#                                 };
+#                             }
+#                         }
+#                     }
+#                 } catch (e) {
+#                     console.error('Erreur lors de l\'analyse JSON:', e);
+#                 }
+                
+#                 // Méthode 3: Chercher les URLs de vidéo dans le HTML
+#                 const html = document.documentElement.innerHTML;
+#                 const videoUrlMatches = html.match(/https?:\/\/[^\s"']+\.mp4[^\s"']*/g);
+#                 if (videoUrlMatches && videoUrlMatches.length > 0) {
+#                     return { url: videoUrlMatches[0], method: 'html_regex' };
+#                 }
+                
+#                 return null;
+#             }""")
+
+#             if video_data and video_data.get('url'):
+#                 video_url = video_data.get('url')
+#                 method = video_data.get('method', 'unknown')
+#                 ctx.info(f"URL vidéo trouvée par {method}: {video_url[:50]}...")
+                
+#                 # Télécharger la vidéo
+#                 async with httpx.AsyncClient(follow_redirects=True) as client:
+#                     headers = {
+#                         'User-Agent': random.choice(USER_AGENTS),
+#                         'Referer': 'https://www.tiktok.com/',
+#                         'Accept': '*/*',
+#                         'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+#                         'Range': 'bytes=0-'  # Pour les téléchargements partiels
+#                     }
+                    
+#                     response = await client.get(video_url, headers=headers)
+                    
+#                     if response.status_code in (200, 206):  # OK ou Partial Content
+#                         # Écrire le fichier
+#                         with open(output_path, "wb") as f:
+#                             f.write(response.content)
+                        
+#                         file_size = os.path.getsize(output_path)
+#                         return {
+#                             "success": True, 
+#                             "file_path": output_path,
+#                             "file_size": file_size,
+#                             "file_size_human": f"{file_size / (1024*1024):.2f} MB",
+#                             "method": f"direct_extraction_{method}"
+#                         }
+#                     else:
+#                         ctx.error(f"Échec du téléchargement direct: {response.status_code}")
+#         except Exception as e:
+#             ctx.error(f"Erreur lors de l'extraction via Playwright: {str(e)}")
+        
+#         # Méthode 3: Utiliser l'API TikTok sans clé
+#         try:
+#             ctx.info("Tentative via l'API TikTok sans clé")
+            
+#             # Extraire l'ID de la vidéo de l'URL
+#             video_id_match = re.search(r'/video/(\d+)', url)
+#             if not video_id_match:
+#                 return {"success": False, "error": "Impossible d'extraire l'ID de la vidéo TikTok"}
+            
+#             video_id = video_id_match.group(1)
+#             api_url = f"https://api16-normal-c-useast1a.tiktokv.com/aweme/v1/feed/?aweme_id={video_id}"
+            
+#             async with httpx.AsyncClient() as client:
+#                 headers = {
+#                     'User-Agent': 'TikTok 26.2.0 rv:262018 (iPhone; iOS 14.4.2; en_US) Cronet',
+#                     'Accept': 'application/json',
+#                 }
+                
+#                 response = await client.get(api_url, headers=headers)
+                
+#                 if response.status_code == 200:
+#                     try:
+#                         json_data = response.json()
+#                         aweme_list = json_data.get('aweme_list', [])
+                        
+#                         if aweme_list and len(aweme_list) > 0:
+#                             # Extraire l'URL de la vidéo
+#                             video_info = aweme_list[0]
+#                             if 'video' in video_info and 'play_addr' in video_info['video']:
+#                                 play_addr = video_info['video']['play_addr']
+#                                 video_url = play_addr.get('url_list', [])[0]
+                                
+#                                 if video_url:
+#                                     # Télécharger la vidéo
+#                                     dl_response = await client.get(video_url)
+                                    
+#                                     if dl_response.status_code == 200:
+#                                         with open(output_path, "wb") as f:
+#                                             f.write(dl_response.content)
+                                        
+#                                         file_size = os.path.getsize(output_path)
+#                                         return {
+#                                             "success": True, 
+#                                             "file_path": output_path,
+#                                             "file_size": file_size,
+#                                             "file_size_human": f"{file_size / (1024*1024):.2f} MB",
+#                                             "method": "tiktok_api"
+#                                         }
+#                     except Exception as e:
+#                         ctx.error(f"Erreur lors du traitement de la réponse API: {str(e)}")
+#         except Exception as e:
+#             ctx.error(f"Erreur lors de l'utilisation de l'API TikTok: {str(e)}")
+        
+#         # Si toutes les méthodes échouent
+#         return {"success": False, "error": "Impossible de télécharger la vidéo avec toutes les méthodes disponibles"}
+        
+#     except Exception as e:
+#         ctx.error(f"Erreur lors du téléchargement de la vidéo TikTok: {str(e)}")
+#         return {"success": False, "error": str(e)}
 
 # --- Fonctions de navigation spécifiques pour TikTok ---
 @mcp_host.tool()

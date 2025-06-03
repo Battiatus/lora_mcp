@@ -267,233 +267,59 @@ class MCPAssistant {
     }
 
     handleWebSocketMessage(message) {
-    switch (message.type) {
-        case 'progress_update':
-            this.updateProgress(message);
-            break;
-        case 'task_completed':
-            this.hideProgress();
-            this.setTaskRunning(false);
-            if (message.final) {
-                this.showTaskResult(message);
-            }
-            break;
-        case 'assistant_message':
-            // Ne pas afficher les messages intermédiaires pendant l'exécution de tâches
-            if (!this.isTaskRunning) {
+        switch (message.type) {
+            case 'progress_update':
+                this.updateProgress(message);
+                break;
+            case 'progress_complete':
+                this.hideProgress();
+                this.setTaskRunning(false);
+                break;
+            case 'assistant_message':
                 this.addMessage('assistant', message.message, message);
-            }
-            break;
-        case 'task_started':
-            this.setTaskRunning(true);
-            this.showProgress('Starting task...', 0);
-            break;
-        case 'execution_stopped':
-            this.hideProgress();
-            this.setTaskRunning(false);
-            this.addMessage('system', message.message, message);
-            break;
-        case 'error':
-            this.showError(message.message);
-            this.setTaskRunning(false);
-            break;
-    }
-}
-
-showTaskResult(message) {
-    // """Afficher le résultat final de la tâche avec screenshots et fichiers"""
-    const container = document.getElementById('messagesContainer');
-    const welcomeMessage = document.getElementById('welcomeMessage');
-    
-    if (welcomeMessage) {
-        welcomeMessage.style.display = 'none';
-    }
-
-    const resultDiv = document.createElement('div');
-    resultDiv.className = 'message assistant task-result';
-    
-    const timestamp = new Date().toLocaleTimeString();
-    
-    // Traiter le contenu du message
-    let processedContent = this.renderMarkdown(message.message);
-    
-    // Créer la section des screenshots si disponibles
-    let screenshotsSection = '';
-    if (message.screenshots && message.screenshots.length > 0) {
-        screenshotsSection = `
-            <div class="screenshots-section">
-                <h4><i class="fas fa-images"></i> Screenshots Captured (${message.screenshots.length})</h4>
-                <div class="screenshots-grid">
-                    ${message.screenshots.map((screenshot, index) => `
-                        <div class="screenshot-item" onclick="mcpAssistant.showScreenshotModal('${screenshot.data}', '${screenshot.format}')">
-                            <img src="data:image/${screenshot.format};base64,${screenshot.data}" 
-                                 alt="Screenshot ${index + 1}" loading="lazy">
-                            <div class="screenshot-caption">Step ${screenshot.step}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    // Vérifier s'il y a des fichiers créés
-    let filesSection = '';
-    if (message.files_created && message.files_created.length > 0) {
-        filesSection = `
-            <div class="files-section">
-                <h4><i class="fas fa-file"></i> Files Created</h4>
-                <div class="files-list">
-                    ${message.files_created.map(file => `
-                        <div class="file-item">
-                            <div class="file-info">
-                                <i class="fas fa-file-alt"></i>
-                                <span class="file-name">${file.filename}</span>
-                            </div>
-                            <div class="file-actions">
-                                <button class="btn-small" onclick="mcpAssistant.downloadFile('${file.uri}', '${file.filename}')">
-                                    <i class="fas fa-download"></i> Download
-                                </button>
-                                <button class="btn-small" onclick="mcpAssistant.previewFile('${file.uri}', '${file.filename}')">
-                                    <i class="fas fa-eye"></i> Preview
-                                </button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-
-    resultDiv.innerHTML = `
-        <div class="message-header">
-            <div class="message-avatar">A</div>
-            <div class="message-info">
-                <div class="message-sender">Assistant</div>
-                <div class="message-time">${timestamp}</div>
-            </div>
-        </div>
-        <div class="message-content task-result-content">
-            <div class="task-summary">
-                <i class="fas fa-check-circle text-success"></i>
-                <span>Task completed in ${message.steps} steps</span>
-            </div>
-            
-            ${this.createResultPreview(processedContent)}
-            
-            ${screenshotsSection}
-            ${filesSection}
-            
-            <div class="result-actions">
-                <button class="btn-secondary" onclick="mcpAssistant.exportTaskResult('${btoa(JSON.stringify(message))}')">
-                    <i class="fas fa-download"></i> Export Complete Result
-                </button>
-                <button class="btn-secondary" onclick="mcpAssistant.shareTaskResult('${message.conversation_id}')">
-                    <i class="fas fa-share"></i> Share
-                </button>
-            </div>
-        </div>
-    `;
-
-    container.appendChild(resultDiv);
-    container.scrollTop = container.scrollHeight;
-}
-
-showScreenshotModal(imageData, format) {
-    // """Afficher une capture d'écran en modal"""
-    const modal = document.getElementById('imageModal');
-    const img = document.getElementById('modalImage');
-    img.src = `data:image/${format};base64,${imageData}`;
-    this.showModal('imageModal');
-}
-
-async downloadFile(uri, filename) {
-    // """Télécharger un fichier créé"""
-    try {
-        const response = await fetch(uri, {
-            headers: {
-                'Authorization': `Bearer ${this.authToken}`
-            }
-        });
-        
-        if (response.ok) {
-            const content = await response.text();
-            this.downloadContent(btoa(content), filename);
-        } else {
-            this.showNotification('Failed to download file', 'error');
+                if (message.final) {
+                    this.setTaskRunning(false);
+                }
+                break;
+            case 'user_message':
+                this.addMessage('user', message.message, message);
+                break;
+            case 'tool_executing':
+                this.showToolExecution(message);
+                break;
+            case 'tool_success':
+            case 'tool_success_image':
+                this.showToolResult(message);
+                break;
+            case 'tool_error':
+                this.showToolError(message);
+                break;
+            case 'task_started':
+                this.setTaskRunning(true);
+                this.showProgress('Starting task...', 0);
+                break;
+            case 'task_completed':
+                this.hideProgress();
+                this.setTaskRunning(false);
+                if (message.final) {
+                    this.addMessage('assistant', message.message, message);
+                }
+                break;
+            case 'screenshots_summary':
+                this.showScreenshotsSummary(message.screenshots);
+                break;
+            case 'execution_stopped':
+                this.hideProgress();
+                this.setTaskRunning(false);
+                this.addMessage('system', message.message, message);
+                break;
+            case 'error':
+                this.showError(message.message);
+                this.setTaskRunning(false);
+                break;
         }
-    } catch (error) {
-        console.error('Download error:', error);
-        this.showNotification('Download failed', 'error');
     }
-}
 
-async previewFile(uri, filename) {
-    // """Prévisualiser un fichier créé"""
-    try {
-        const response = await fetch(uri, {
-            headers: {
-                'Authorization': `Bearer ${this.authToken}`
-            }
-        });
-        
-        if (response.ok) {
-            const content = await response.text();
-            const modal = document.getElementById('resultModal');
-            const contentDiv = document.getElementById('resultContent');
-            
-            // Déterminer le type de contenu et l'afficher approprié
-            if (filename.endsWith('.md')) {
-                contentDiv.innerHTML = this.renderMarkdown(content);
-            } else if (filename.endsWith('.html')) {
-                contentDiv.innerHTML = content;
-            } else if (filename.endsWith('.json')) {
-                contentDiv.innerHTML = `<pre><code class="language-json">${JSON.stringify(JSON.parse(content), null, 2)}</code></pre>`;
-            } else {
-                contentDiv.innerHTML = `<pre><code>${content}</code></pre>`;
-            }
-            
-            this.showModal('resultModal');
-            
-            // Setup download button
-            document.getElementById('downloadResult').onclick = () => {
-                this.downloadContent(btoa(content), filename);
-            };
-        } else {
-            this.showNotification('Failed to preview file', 'error');
-        }
-    } catch (error) {
-        console.error('Preview error:', error);
-        this.showNotification('Preview failed', 'error');
-    }
-}
-
-exportTaskResult(encodedResult) {
-    // """Exporter le résultat complet de la tâche"""
-    const result = JSON.parse(atob(encodedResult));
-    
-    // Créer un rapport complet
-    let report = `# Task Execution Report\n\n`;
-    report += `**Completed:** ${new Date().toLocaleString()}\n`;
-    report += `**Steps:** ${result.steps}\n\n`;
-    report += `## Result\n\n${result.message}\n\n`;
-    
-    if (result.screenshots && result.screenshots.length > 0) {
-        report += `## Screenshots (${result.screenshots.length})\n\n`;
-        result.screenshots.forEach((screenshot, index) => {
-            report += `- Screenshot ${index + 1} (Step ${screenshot.step})\n`;
-        });
-        report += `\n`;
-    }
-    
-    if (result.files_created && result.files_created.length > 0) {
-        report += `## Files Created\n\n`;
-        result.files_created.forEach(file => {
-            report += `- ${file.filename}\n`;
-        });
-    }
-    
-    this.downloadContent(btoa(report), `task_report_${Date.now()}.md`);
-}
     async loadConversations() {
         try {
             const response = await fetch('/conversations', {
@@ -651,50 +477,45 @@ exportTaskResult(encodedResult) {
         }
     }
 
-   // Simplifier l'affichage des messages pendant l'exécution
-addMessage(role, content, metadata = {}) {
-    // Ne pas afficher les messages intermédiaires pendant l'exécution de tâches
-    if (this.isTaskRunning && role === 'assistant' && !metadata.final) {
-        return;
-    }
-    
-    const container = document.getElementById('messagesContainer');
-    const welcomeMessage = document.getElementById('welcomeMessage');
-    
-    if (welcomeMessage) {
-        welcomeMessage.style.display = 'none';
-    }
+    addMessage(role, content, metadata = {}) {
+        const container = document.getElementById('messagesContainer');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+        
+        if (welcomeMessage) {
+            welcomeMessage.style.display = 'none';
+        }
 
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}`;
-    
-    const avatarIcon = role === 'user' ? 'U' : 
-                      role === 'assistant' ? 'A' : 'S';
-    
-    const timestamp = new Date().toLocaleTimeString();
-    
-    let processedContent = content;
-    if (typeof content === 'string') {
-        processedContent = this.renderMarkdown(content);
-    }
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}`;
+        
+        const avatarIcon = role === 'user' ? 'U' : 
+                          role === 'assistant' ? 'A' : 'S';
+        
+        const timestamp = new Date().toLocaleTimeString();
+        
+        // Process content based on type
+        let processedContent = content;
+        if (typeof content === 'string') {
+            processedContent = this.renderMarkdown(content);
+        }
 
-    messageDiv.innerHTML = `
-        <div class="message-header">
-            <div class="message-avatar">${avatarIcon}</div>
-            <div class="message-info">
-                <div class="message-sender">${role.charAt(0).toUpperCase() + role.slice(1)}</div>
-                <div class="message-time">${timestamp}</div>
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <div class="message-avatar">${avatarIcon}</div>
+                <div class="message-info">
+                    <div class="message-sender">${role.charAt(0).toUpperCase() + role.slice(1)}</div>
+                    <div class="message-time">${timestamp}</div>
+                </div>
             </div>
-        </div>
-        <div class="message-content">
-            ${this.createResultPreview(processedContent)}
-            ${this.createMessageActions(role, content, metadata)}
-        </div>
-    `;
+            <div class="message-content">
+                ${this.createResultPreview(processedContent)}
+                ${this.createMessageActions(role, content, metadata)}
+            </div>
+        `;
 
-    container.appendChild(messageDiv);
-    container.scrollTop = container.scrollHeight;
-}
+        container.appendChild(messageDiv);
+        container.scrollTop = container.scrollHeight;
+    }
 
     createResultPreview(content) {
         const maxLength = 1000;

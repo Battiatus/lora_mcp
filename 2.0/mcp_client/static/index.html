@@ -6,152 +6,247 @@
     <title>MCP Advanced Assistant</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-header">
+
+
+    <!-- Login Screen -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">
+                    <i class="fas fa-robot"></i>
+                    <h1>MCP Assistant</h1>
+                </div>
+                <p>Secure access to your AI assistant</p>
+            </div>
+            <form class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Sign In
+                </button>
+            </form>
+            <div class="login-error" id="loginError"></div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app-container" id="appContainer" style="display: none;">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <button class="sidebar-toggle" id="sidebarToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <div class="logo">
                     <i class="fas fa-robot"></i>
                     <span>MCP Assistant</span>
                 </div>
-                <div class="status-indicator" id="connectionStatus">
-                    <div class="status-dot"></div>
-                    <span>Connecting...</span>
-                </div>
             </div>
-            
-            <div class="sidebar-content">
-                <div class="mode-selector">
-                    <button class="mode-btn active" data-mode="chat">
-                        <i class="fas fa-comments"></i>
-                        <span>Chat Mode</span>
-                    </button>
-                    <button class="mode-btn" data-mode="task">
-                        <i class="fas fa-tasks"></i>
-                        <span>Task Mode</span>
-                    </button>
-                </div>
-                
-                <div class="quick-actions">
-                    <h3>Quick Actions</h3>
-                    <div class="action-grid">
-                        <button class="action-btn" data-action="screenshot">
-                            <i class="fas fa-camera"></i>
-                            <span>Screenshot</span>
-                        </button>
-                        <button class="action-btn" data-action="navigate">
-                            <i class="fas fa-globe"></i>
-                            <span>Navigate</span>
-                        </button>
-                        <button class="action-btn" data-action="research">
-                            <i class="fas fa-search"></i>
-                            <span>Research</span>
-                        </button>
-                        <button class="action-btn" data-action="analyze">
-                            <i class="fas fa-chart-line"></i>
-                            <span>Analyze</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="examples-section">
-                    <h3>Example Commands</h3>
-                    <div class="examples-list">
-                        <div class="example-item" data-example="Research the latest AI trends and create a comprehensive report">
-                            <i class="fas fa-brain"></i>
-                            <span>AI Trends Research</span>
-                        </div>
-                        <div class="example-item" data-example="Navigate to news websites and analyze current events">
-                            <i class="fas fa-newspaper"></i>
-                            <span>News Analysis</span>
-                        </div>
-                        <div class="example-item" data-example="Take screenshots and document the user interface">
-                            <i class="fas fa-desktop"></i>
-                            <span>UI Documentation</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Main Content -->
-        <div class="main-content">
-            <div class="chat-header">
+            <div class="header-center">
                 <h1 id="chatTitle">Intelligent Web Assistant</h1>
-                <div class="chat-controls">
-                    <button class="control-btn" id="clearChat">
-                        <i class="fas fa-trash"></i>
-                        Clear Chat
+            </div>
+            <div class="header-right">
+                <div class="api-limits" id="apiLimits">
+                    <i class="fas fa-chart-line"></i>
+                    <span id="remainingCalls">Loading...</span>
+                </div>
+                <div class="user-menu">
+                    <button class="user-avatar" id="userAvatar">
+                        <img src="/avatar" alt="User" id="avatarImg">
                     </button>
-                    <button class="control-btn" id="exportChat">
-                        <i class="fas fa-download"></i>
-                        Export
-                    </button>
+                    <div class="user-dropdown" id="userDropdown">
+                        <div class="user-info">
+                            <img src="/avatar" alt="User" id="dropdownAvatar">
+                            <span id="username">User</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="changeAvatar">
+                            <i class="fas fa-user-circle"></i>
+                            Change Avatar
+                        </button>
+                        <button class="dropdown-item" id="exportData">
+                            <i class="fas fa-download"></i>
+                            Export Data
+                        </button>
+                        <button class="dropdown-item" id="logoutBtn">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </div>
-            
-            <div class="chat-container">
-                <div class="messages-container" id="messagesContainer">
-                    <div class="welcome-message">
-                        <div class="welcome-icon">
-                            <i class="fas fa-robot"></i>
-                        </div>
-                        <h2>Welcome to MCP Advanced Assistant</h2>
-                        <p>Your intelligent web automation and research companion. Choose a mode and start your conversation.</p>
-                        <div class="welcome-features">
-                            <div class="feature">
-                                <i class="fas fa-globe"></i>
-                                <span>Web Navigation</span>
-                            </div>
-                            <div class="feature">
-                                <i class="fas fa-search"></i>
-                                <span>Research & Analysis</span>
-                            </div>
-                            <div class="feature">
-                                <i class="fas fa-cogs"></i>
-                                <span>Task Automation</span>
-                            </div>
-                        </div>
+        </header>
+
+        <div class="app-body">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <button class="new-chat-btn" id="newChatBtn">
+                        <i class="fas fa-plus"></i>
+                        New Conversation
+                    </button>
+                    <div class="status-indicator" id="connectionStatus">
+                        <div class="status-dot"></div>
+                        <span>Connecting...</span>
                     </div>
                 </div>
                 
-                <div class="input-container">
-                    <div class="input-wrapper">
-                        <textarea 
-                            id="messageInput" 
-                            placeholder="Type your message or describe a task..."
-                            rows="1"
-                        ></textarea>
-                        <div class="input-actions">
-                            <button class="action-btn-small" id="attachBtn">
-                                <i class="fas fa-paperclip"></i>
+                <div class="sidebar-content">
+                    <!-- Conversations History -->
+                    <div class="conversations-section">
+                        <h3>Recent Conversations</h3>
+                        <div class="conversations-list" id="conversationsList">
+                            <!-- Conversations will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div class="sidebar-divider"></div>
+                    
+                    <!-- Mode Selector -->
+                    <div class="mode-selector">
+                        <button class="mode-btn active" data-mode="chat">
+                            <i class="fas fa-comments"></i>
+                            <span>Chat Mode</span>
+                        </button>
+                        <button class="mode-btn" data-mode="task">
+                            <i class="fas fa-tasks"></i>
+                            <span>Task Mode</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="quick-actions">
+                        <h3>Quick Actions</h3>
+                        <div class="action-grid">
+                            <button class="action-btn" data-action="screenshot">
+                                <i class="fas fa-camera"></i>
+                                <span>Screenshot</span>
                             </button>
-                            <button class="send-btn" id="sendBtn">
-                                <i class="fas fa-paper-plane"></i>
+                            <button class="action-btn" data-action="navigate">
+                                <i class="fas fa-globe"></i>
+                                <span>Navigate</span>
+                            </button>
+                            <button class="action-btn" data-action="research">
+                                <i class="fas fa-search"></i>
+                                <span>Research</span>
+                            </button>
+                            <button class="action-btn" data-action="analyze">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Analyze</span>
                             </button>
                         </div>
                     </div>
-                    <div class="input-footer">
-                        <span class="input-hint">Press Enter to send, Shift+Enter for new line</span>
-                        <div class="typing-indicator" id="typingIndicator">
-                            <div class="typing-dots">
-                                <span></span>
-                                <span></span>
-                                <span></span>
+                    
+                    <!-- Examples -->
+                    <div class="examples-section">
+                        <h3>Example Commands</h3>
+                        <div class="examples-list">
+                            <div class="example-item" data-example="Research the latest AI trends and create a comprehensive report">
+                                <i class="fas fa-brain"></i>
+                                <span>AI Trends Research</span>
                             </div>
-                            <span>Assistant is thinking...</span>
+                            <div class="example-item" data-example="Navigate to news websites and analyze current events">
+                                <i class="fas fa-newspaper"></i>
+                                <span>News Analysis</span>
+                            </div>
+                            <div class="example-item" data-example="Take screenshots and document the user interface">
+                                <i class="fas fa-desktop"></i>
+                                <span>UI Documentation</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </aside>
+            
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Progress Bar -->
+                <div class="progress-container" id="progressContainer" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span id="progressMessage">Processing...</span>
+                        <button class="progress-details-btn" id="progressDetailsBtn">
+                            <i class="fas fa-info-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Chat Container -->
+                <div class="chat-container">
+                    <div class="messages-container" id="messagesContainer">
+                        <div class="welcome-message" id="welcomeMessage">
+                            <div class="welcome-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h2>Welcome to MCP Advanced Assistant</h2>
+                            <p>Your intelligent web automation and research companion. Choose a mode and start your conversation.</p>
+                            <div class="welcome-features">
+                                <div class="feature">
+                                    <i class="fas fa-globe"></i>
+                                    <span>Web Navigation</span>
+                                </div>
+                                <div class="feature">
+                                    <i class="fas fa-search"></i>
+                                    <span>Research & Analysis</span>
+                                </div>
+                                <div class="feature">
+                                    <i class="fas fa-cogs"></i>
+                                    <span>Task Automation</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Input Container -->
+                    <div class="input-container">
+                        <div class="input-wrapper">
+                            <textarea 
+                                id="messageInput" 
+                                placeholder="Type your message or describe a task..."
+                                rows="1"
+                            ></textarea>
+                            <div class="input-actions">
+                                <button class="action-btn-small" id="attachBtn">
+                                    <i class="fas fa-paperclip"></i>
+                                </button>
+                                <button class="send-btn" id="sendBtn">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="input-footer">
+                            <span class="input-hint">Press Enter to send, Shift+Enter for new line</span>
+                            <div class="typing-indicator" id="typingIndicator">
+                                <div class="typing-dots">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                                <span>Assistant is thinking...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
     </div>
     
     <!-- Modals -->
     <div class="modal-overlay" id="modalOverlay">
+        <!-- Image Modal -->
         <div class="modal" id="imageModal">
             <div class="modal-header">
                 <h3>Screenshot</h3>
@@ -163,8 +258,1349 @@
                 <img id="modalImage" src="" alt="Screenshot">
             </div>
         </div>
+
+        <!-- Progress Details Modal -->
+        <div class="modal" id="progressModal">
+            <div class="modal-header">
+                <h3>Task Progress Details</h3>
+                <button class="modal-close" id="closeProgressModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="progress-details" id="progressDetails">
+                    <!-- Progress details will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Preview Modal -->
+        <div class="modal large" id="resultModal">
+            <div class="modal-header">
+                <h3>Task Result</h3>
+                <div class="modal-actions">
+                    <button class="btn-secondary" id="downloadResult">
+                        <i class="fas fa-download"></i>
+                        Download
+                    </button>
+                    <button class="modal-close" id="closeResultModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-content">
+                <div class="result-content" id="resultContent">
+                    <!-- Result content will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Screenshots Gallery Modal -->
+        <div class="modal large" id="screenshotsModal">
+            <div class="modal-header">
+                <h3>Screenshots Gallery</h3>
+                <button class="modal-close" id="closeScreenshotsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="screenshots-gallery" id="screenshotsGallery">
+                    <!-- Screenshots will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div class="modal" id="exportModal">
+            <div class="modal-header">
+                <h3>Export Conversation</h3>
+                <button class="modal-close" id="closeExportModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="export-options">
+                    <button class="export-btn" data-format="markdown">
+                        <i class="fab fa-markdown"></i>
+                        <span>Markdown</span>
+                    </button>
+                    <button class="export-btn" data-format="html">
+                        <i class="fas fa-code"></i>
+                        <span>HTML</span>
+                    </button>
+                    <button class="export-btn" data-format="json">
+                        <i class="fas fa-file-code"></i>
+                        <span>JSON</span>
+                    </button>
+                    <button class="export-btn" data-format="pdf">
+                        <i class="fas fa-file-pdf"></i>
+                        <span>PDF</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- File input for avatar change -->
+    <input type="file" id="avatarInput" accept="image/*" style="display: none;">
     
-    <script src="/static/app.js"></script>
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <!-- <script src="js/app.js"></script> -->
+
+<script>
+class MCPAssistant {
+    constructor() {
+        this.websocket = null;
+        this.sessionId = null;
+        this.currentConversationId = null;
+        this.isConnected = false;
+        this.isTaskRunning = false;
+        this.currentUser = null;
+        this.authToken = null;
+        
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.checkAuthentication();
+        this.setupMarkdownRenderer();
+    }
+
+    setupEventListeners() {
+        // Login form
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleLogin();
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
+
+        // Sidebar toggle
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+
+        // New chat button
+        document.getElementById('newChatBtn').addEventListener('click', () => {
+            this.createNewConversation();
+        });
+
+        // Send message
+        document.getElementById('sendBtn').addEventListener('click', () => {
+            if (this.isTaskRunning) {
+                this.stopExecution();
+            } else {
+                this.sendMessage();
+            }
+        });
+
+        // Message input
+        const messageInput = document.getElementById('messageInput');
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (this.isTaskRunning) {
+                    this.stopExecution();
+                } else {
+                    this.sendMessage();
+                }
+            }
+        });
+
+        // Auto-resize textarea
+        messageInput.addEventListener('input', () => {
+            this.autoResizeTextarea(messageInput);
+        });
+
+        // Mode selector
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.setMode(btn.dataset.mode);
+            });
+        });
+
+        // Quick actions
+        document.querySelectorAll('.action-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.executeQuickAction(btn.dataset.action);
+            });
+        });
+
+        // Examples
+        document.querySelectorAll('.example-item').forEach(item => {
+            item.addEventListener('click', () => {
+                this.useExample(item.dataset.example);
+            });
+        });
+
+        // User menu
+        document.getElementById('userAvatar').addEventListener('click', () => {
+            this.toggleUserMenu();
+        });
+
+        // Change avatar
+        document.getElementById('changeAvatar').addEventListener('click', () => {
+            this.changeAvatar();
+        });
+
+        // Export data
+        document.getElementById('exportData').addEventListener('click', () => {
+            this.showExportModal();
+        });
+
+        // Progress details
+        document.getElementById('progressDetailsBtn').addEventListener('click', () => {
+            this.showProgressDetails();
+        });
+
+        // Modal close buttons
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.closeModal(btn.closest('.modal').id);
+            });
+        });
+
+        // Export buttons
+        document.querySelectorAll('.export-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.exportConversation(btn.dataset.format);
+            });
+        });
+
+        // Click outside to close modals and dropdowns
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-menu')) {
+                this.closeUserMenu();
+            }
+            if (e.target.classList.contains('modal-overlay')) {
+                this.closeAllModals();
+            }
+        });
+
+        // Avatar file input
+        document.getElementById('avatarInput').addEventListener('change', (e) => {
+            this.handleAvatarChange(e);
+        });
+    }
+
+    async checkAuthentication() {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            this.showLogin();
+            return;
+        }
+
+        try {
+            const response = await fetch('/auth/me', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const user = await response.json();
+                this.currentUser = user;
+                this.authToken = token;
+                this.showApp();
+                this.loadConversations();
+                this.loadApiLimits();
+                this.connectWebSocket();
+            } else {
+                localStorage.removeItem('auth_token');
+                this.showLogin();
+            }
+        } catch (error) {
+            console.error('Authentication check failed:', error);
+            this.showLogin();
+        }
+    }
+
+    async handleLogin() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('loginError');
+
+        try {
+            const response = await fetch('/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('auth_token', data.access_token);
+                this.currentUser = data.user;
+                this.authToken = data.access_token;
+                this.showApp();
+                this.loadConversations();
+                this.loadApiLimits();
+                this.connectWebSocket();
+            } else {
+                const error = await response.json();
+                errorDiv.textContent = error.detail || 'Login failed';
+                errorDiv.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            errorDiv.textContent = 'Connection error. Please try again.';
+            errorDiv.style.display = 'block';
+        }
+    }
+
+    logout() {
+        localStorage.removeItem('auth_token');
+        this.currentUser = null;
+        this.authToken = null;
+        if (this.websocket) {
+            this.websocket.close();
+        }
+        this.showLogin();
+    }
+
+    showLogin() {
+        document.getElementById('loginContainer').style.display = 'flex';
+        document.getElementById('appContainer').style.display = 'none';
+    }
+
+    showApp() {
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('appContainer').style.display = 'flex';
+        
+        // Update user info
+        if (this.currentUser) {
+            document.getElementById('username').textContent = this.currentUser.username;
+            document.getElementById('avatarImg').src = this.currentUser.avatar;
+            document.getElementById('dropdownAvatar').src = this.currentUser.avatar;
+        }
+    }
+
+    connectWebSocket() {
+        this.sessionId = this.generateSessionId();
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/${this.sessionId}`;
+
+        this.websocket = new WebSocket(wsUrl);
+
+        this.websocket.onopen = () => {
+            this.isConnected = true;
+            this.updateConnectionStatus('Connected', 'connected');
+        };
+
+        this.websocket.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            this.handleWebSocketMessage(message);
+        };
+
+        this.websocket.onclose = () => {
+            this.isConnected = false;
+            this.updateConnectionStatus('Disconnected', 'disconnected');
+            
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+                if (!this.isConnected) {
+                    this.connectWebSocket();
+                }
+            }, 3000);
+        };
+
+        this.websocket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.updateConnectionStatus('Error', 'error');
+        };
+    }
+
+    handleWebSocketMessage(message) {
+    switch (message.type) {
+        case 'progress_update':
+            this.updateProgress(message);
+            break;
+        case 'task_completed':
+            this.hideProgress();
+            this.setTaskRunning(false);
+            if (message.final) {
+                this.showTaskResult(message);
+            }
+            break;
+        case 'assistant_message':
+            // Ne pas afficher les messages intermédiaires pendant l'exécution de tâches
+            if (!this.isTaskRunning) {
+                this.addMessage('assistant', message.message, message);
+            }
+            break;
+        case 'task_started':
+            this.setTaskRunning(true);
+            this.showProgress('Starting task...', 0);
+            break;
+        case 'execution_stopped':
+            this.hideProgress();
+            this.setTaskRunning(false);
+            this.addMessage('system', message.message, message);
+            break;
+        case 'error':
+            this.showError(message.message);
+            this.setTaskRunning(false);
+            break;
+    }
+}
+
+showTaskResult(message) {
+    // """Afficher le résultat final de la tâche avec screenshots et fichiers"""
+    const container = document.getElementById('messagesContainer');
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    
+    if (welcomeMessage) {
+        welcomeMessage.style.display = 'none';
+    }
+
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'message assistant task-result';
+    
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Traiter le contenu du message
+    let processedContent = this.renderMarkdown(message.message);
+    
+    // Créer la section des screenshots si disponibles
+    let screenshotsSection = '';
+    if (message.screenshots && message.screenshots.length > 0) {
+        screenshotsSection = `
+            <div class="screenshots-section">
+                <h4><i class="fas fa-images"></i> Screenshots Captured (${message.screenshots.length})</h4>
+                <div class="screenshots-grid">
+                    ${message.screenshots.map((screenshot, index) => `
+                        <div class="screenshot-item" onclick="mcpAssistant.showScreenshotModal('${screenshot.data}', '${screenshot.format}')">
+                            <img src="data:image/${screenshot.format};base64,${screenshot.data}" 
+                                 alt="Screenshot ${index + 1}" loading="lazy">
+                            <div class="screenshot-caption">Step ${screenshot.step}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Vérifier s'il y a des fichiers créés
+    let filesSection = '';
+    if (message.files_created && message.files_created.length > 0) {
+        filesSection = `
+            <div class="files-section">
+                <h4><i class="fas fa-file"></i> Files Created</h4>
+                <div class="files-list">
+                    ${message.files_created.map(file => `
+                        <div class="file-item">
+                            <div class="file-info">
+                                <i class="fas fa-file-alt"></i>
+                                <span class="file-name">${file.filename}</span>
+                            </div>
+                            <div class="file-actions">
+                                <button class="btn-small" onclick="mcpAssistant.downloadFile('${file.uri}', '${file.filename}')">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                                <button class="btn-small" onclick="mcpAssistant.previewFile('${file.uri}', '${file.filename}')">
+                                    <i class="fas fa-eye"></i> Preview
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    resultDiv.innerHTML = `
+        <div class="message-header">
+            <div class="message-avatar">A</div>
+            <div class="message-info">
+                <div class="message-sender">Assistant</div>
+                <div class="message-time">${timestamp}</div>
+            </div>
+        </div>
+        <div class="message-content task-result-content">
+            <div class="task-summary">
+                <i class="fas fa-check-circle text-success"></i>
+                <span>Task completed in ${message.steps} steps</span>
+            </div>
+            
+            ${this.createResultPreview(processedContent)}
+            
+            ${screenshotsSection}
+            ${filesSection}
+            
+            <div class="result-actions">
+                <button class="btn-secondary" onclick="mcpAssistant.exportTaskResult('${btoa(JSON.stringify(message))}')">
+                    <i class="fas fa-download"></i> Export Complete Result
+                </button>
+                <button class="btn-secondary" onclick="mcpAssistant.shareTaskResult('${message.conversation_id}')">
+                    <i class="fas fa-share"></i> Share
+                </button>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(resultDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+showScreenshotModal(imageData, format) {
+    // """Afficher une capture d'écran en modal"""
+    const modal = document.getElementById('imageModal');
+    const img = document.getElementById('modalImage');
+    img.src = `data:image/${format};base64,${imageData}`;
+    this.showModal('imageModal');
+}
+
+async downloadFile(uri, filename) {
+    // """Télécharger un fichier créé"""
+    try {
+        const response = await fetch(uri, {
+            headers: {
+                'Authorization': `Bearer ${this.authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const content = await response.text();
+            this.downloadContent(btoa(content), filename);
+        } else {
+            this.showNotification('Failed to download file', 'error');
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        this.showNotification('Download failed', 'error');
+    }
+}
+
+async previewFile(uri, filename) {
+    // """Prévisualiser un fichier créé"""
+    try {
+        const response = await fetch(uri, {
+            headers: {
+                'Authorization': `Bearer ${this.authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const content = await response.text();
+            const modal = document.getElementById('resultModal');
+            const contentDiv = document.getElementById('resultContent');
+            
+            // Déterminer le type de contenu et l'afficher approprié
+            if (filename.endsWith('.md')) {
+                contentDiv.innerHTML = this.renderMarkdown(content);
+            } else if (filename.endsWith('.html')) {
+                contentDiv.innerHTML = content;
+            } else if (filename.endsWith('.json')) {
+                contentDiv.innerHTML = `<pre><code class="language-json">${JSON.stringify(JSON.parse(content), null, 2)}</code></pre>`;
+            } else {
+                contentDiv.innerHTML = `<pre><code>${content}</code></pre>`;
+            }
+            
+            this.showModal('resultModal');
+            
+            // Setup download button
+            document.getElementById('downloadResult').onclick = () => {
+                this.downloadContent(btoa(content), filename);
+            };
+        } else {
+            this.showNotification('Failed to preview file', 'error');
+        }
+    } catch (error) {
+        console.error('Preview error:', error);
+        this.showNotification('Preview failed', 'error');
+    }
+}
+
+exportTaskResult(encodedResult) {
+    // """Exporter le résultat complet de la tâche"""
+    const result = JSON.parse(atob(encodedResult));
+    
+    // Créer un rapport complet
+    let report = `# Task Execution Report\n\n`;
+    report += `**Completed:** ${new Date().toLocaleString()}\n`;
+    report += `**Steps:** ${result.steps}\n\n`;
+    report += `## Result\n\n${result.message}\n\n`;
+    
+    if (result.screenshots && result.screenshots.length > 0) {
+        report += `## Screenshots (${result.screenshots.length})\n\n`;
+        result.screenshots.forEach((screenshot, index) => {
+            report += `- Screenshot ${index + 1} (Step ${screenshot.step})\n`;
+        });
+        report += `\n`;
+    }
+    
+    if (result.files_created && result.files_created.length > 0) {
+        report += `## Files Created\n\n`;
+        result.files_created.forEach(file => {
+            report += `- ${file.filename}\n`;
+        });
+    }
+    
+    this.downloadContent(btoa(report), `task_report_${Date.now()}.md`);
+}
+    async loadConversations() {
+        try {
+            const response = await fetch('/conversations', {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.renderConversations(data.conversations);
+            }
+        } catch (error) {
+            console.error('Failed to load conversations:', error);
+        }
+    }
+
+    async loadApiLimits() {
+        try {
+            const response = await fetch('/api/limits', {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('remainingCalls').textContent = `${data.remaining_calls} calls remaining`;
+            }
+        } catch (error) {
+            console.error('Failed to load API limits:', error);
+        }
+    }
+
+    renderConversations(conversations) {
+        const container = document.getElementById('conversationsList');
+        container.innerHTML = '';
+
+        conversations.forEach(conv => {
+            const item = document.createElement('div');
+            item.className = 'conversation-item';
+            item.dataset.conversationId = conv.id;
+            
+            item.innerHTML = `
+                <div class="conversation-title">${conv.title}</div>
+                <div class="conversation-date">${new Date(conv.updated_at).toLocaleDateString()}</div>
+            `;
+
+            item.addEventListener('click', () => {
+                this.loadConversation(conv.id);
+            });
+
+            container.appendChild(item);
+        });
+    }
+
+    async createNewConversation() {
+        try {
+            const response = await fetch('/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
+                },
+                body: JSON.stringify({
+                    title: `New Conversation ${new Date().toLocaleDateString()}`
+                })
+            });
+
+            if (response.ok) {
+                const conversation = await response.json();
+                this.currentConversationId = conversation.id;
+                this.clearMessages();
+                this.loadConversations();
+                this.updateChatTitle(conversation.title);
+            }
+        } catch (error) {
+            console.error('Failed to create conversation:', error);
+        }
+    }
+
+async loadConversation(conversationId) {
+    try {
+        const response = await fetch(`/conversations/${conversationId}`, {
+            headers: {
+                'Authorization': `Bearer ${this.authToken}`
+            }
+        });
+
+        if (response.ok) {
+            const conversation = await response.json();
+            this.currentConversationId = conversationId;
+            this.clearMessages();
+            this.updateChatTitle(conversation.title);
+            
+            // Debug: afficher les messages reçus dans la console
+            console.log("Messages récupérés:", conversation.messages);
+            
+            // Load messages with proper processing
+            if (conversation.messages && Array.isArray(conversation.messages)) {
+                conversation.messages.forEach(msg => {
+                    // Ignore system messages (optionnel - retirez cette condition si vous voulez les afficher)
+                    if (msg.role === 'system') return;
+                    
+                    // Traiter le contenu selon son type
+                    let processedContent = msg.content;
+                    
+                    // Tenter de traiter les contenus qui sont des chaînes représentant des tableaux
+                    if (typeof processedContent === 'string' && 
+                        processedContent.startsWith('[{') && 
+                        processedContent.endsWith('}]')) {
+                        try {
+                            // Utiliser eval pour parser la chaîne (attention: à utiliser avec précaution)
+                            // On pourrait aussi utiliser JSON.parse si le format est JSON valide
+                            const contentArray = eval(processedContent);
+                            if (Array.isArray(contentArray)) {
+                                // Extraire les textes
+                                processedContent = contentArray.map(item => 
+                                    item.text || JSON.stringify(item)
+                                ).join("\n\n");
+                            }
+                        } catch (e) {
+                            console.error("Erreur lors du traitement du contenu:", e);
+                            // En cas d'erreur, garder le contenu original
+                        }
+                    }
+                    
+                    this.addMessage(msg.role, processedContent, { conversation_id: conversationId });
+                });
+            } else {
+                console.error("Format de messages invalide:", conversation.messages);
+            }
+
+            // Update active conversation
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-conversation-id="${conversationId}"]`)?.classList.add('active');
+        } else {
+            console.error("Erreur lors du chargement de la conversation:", response.status);
+        }
+    } catch (error) {
+        console.error('Failed to load conversation:', error);
+    }
+}
+
+    sendMessage() {
+        const input = document.getElementById('messageInput');
+        const message = input.value.trim();
+
+        if (!message || !this.isConnected) return;
+
+        // Add user message to UI
+        this.addMessage('user', message);
+        input.value = '';
+        this.autoResizeTextarea(input);
+
+        // Send to WebSocket
+        const messageData = {
+            type: this.getCurrentMode() === 'task' ? 'task' : 'chat',
+            message: message,
+            conversation_id: this.currentConversationId
+        };
+
+        this.websocket.send(JSON.stringify(messageData));
+        this.setTaskRunning(true);
+        this.showProgress('Processing your request...', 10);
+    }
+
+    stopExecution() {
+        if (this.websocket && this.isTaskRunning) {
+            this.websocket.send(JSON.stringify({
+                type: 'stop_execution'
+            }));
+        }
+    }
+
+    setTaskRunning(isRunning) {
+        this.isTaskRunning = isRunning;
+        const sendBtn = document.getElementById('sendBtn');
+        
+        if (isRunning) {
+            sendBtn.classList.add('stop');
+            sendBtn.innerHTML = '<i class="fas fa-stop"></i>';
+            sendBtn.title = 'Stop execution';
+        } else {
+            sendBtn.classList.remove('stop');
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+            sendBtn.title = 'Send message';
+        }
+    }
+
+   // Simplifier l'affichage des messages pendant l'exécution
+addMessage(role, content, metadata = {}) {
+    // Ne pas afficher les messages intermédiaires pendant l'exécution de tâches
+    if (this.isTaskRunning && role === 'assistant' && !metadata.final) {
+        return;
+    }
+    
+    const container = document.getElementById('messagesContainer');
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    
+    if (welcomeMessage) {
+        welcomeMessage.style.display = 'none';
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    const avatarIcon = role === 'user' ? 'U' : 
+                      role === 'assistant' ? 'A' : 'S';
+    
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Traitement amélioré du contenu
+    let processedContent = '';
+    
+    // Si contenu est une chaîne
+    if (typeof content === 'string') {
+        // Vérifier si c'est une erreur et appliquer un style spécial
+        if (content.includes('Error') || content.includes('error')) {
+            processedContent = `<div class="error-message"><i class="fas fa-exclamation-triangle"></i> ${content}</div>`;
+        } else {
+            // Sinon, utiliser le rendu markdown normal
+            processedContent = this.renderMarkdown(content);
+        }
+    } else if (content && typeof content === 'object') {
+        // Si c'est un objet, le convertir en chaîne formatée
+        processedContent = `<pre>${JSON.stringify(content, null, 2)}</pre>`;
+    } else {
+        // Pour tout autre cas
+        processedContent = String(content);
+    }
+
+    messageDiv.innerHTML = `
+        <div class="message-header">
+            <div class="message-avatar">${avatarIcon}</div>
+            <div class="message-info">
+                <div class="message-sender">${role.charAt(0).toUpperCase() + role.slice(1)}</div>
+                <div class="message-time">${timestamp}</div>
+            </div>
+        </div>
+        <div class="message-content">
+            ${this.createResultPreview(processedContent)}
+            ${this.createMessageActions(role, content, metadata)}
+        </div>
+    `;
+
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+    
+    // Log pour debug
+    console.log(`Message ajouté: role=${role}, content=`, content);
+}
+    createResultPreview(content) {
+        const maxLength = 1000;
+        if (content.length > maxLength) {
+            return `
+                <div class="result-preview truncated">
+                    ${content.substring(0, maxLength)}...
+                </div>
+                <button class="show-more-btn" onclick="mcpAssistant.showFullResult('${btoa(content)}')">
+                    <i class="fas fa-expand-alt"></i> Show Full Result
+                </button>
+            `;
+        }
+        return content;
+    }
+
+    createMessageActions(role, content, metadata) {
+        if (role === 'assistant') {
+            return `
+                <div class="message-actions">
+                    <button class="message-action" onclick="mcpAssistant.copyToClipboard('${btoa(content)}')">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <button class="message-action" onclick="mcpAssistant.downloadContent('${btoa(content)}', 'result.md')">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            `;
+        }
+        return '';
+    }
+
+    showFullResult(encodedContent) {
+        const content = atob(encodedContent);
+        const modal = document.getElementById('resultModal');
+        const contentDiv = document.getElementById('resultContent');
+        
+        contentDiv.innerHTML = this.renderMarkdown(content);
+        this.showModal('resultModal');
+        
+        // Setup download button
+        document.getElementById('downloadResult').onclick = () => {
+            this.downloadContent(encodedContent, 'full_result.md');
+        };
+    }
+
+    copyToClipboard(encodedContent) {
+        const content = atob(encodedContent);
+        navigator.clipboard.writeText(content).then(() => {
+            this.showNotification('Content copied to clipboard!', 'success');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            this.showNotification('Failed to copy content', 'error');
+        });
+    }
+
+    downloadContent(encodedContent, filename) {
+        const content = atob(encodedContent);
+        const blob = new Blob([content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    showProgress(message, progress) {
+        const container = document.getElementById('progressContainer');
+        const fill = document.getElementById('progressFill');
+        const messageSpan = document.getElementById('progressMessage');
+        
+        container.style.display = 'block';
+        fill.style.width = `${progress}%`;
+        messageSpan.textContent = message;
+    }
+
+    updateProgress(data) {
+        this.showProgress(data.message, data.progress || 0);
+    }
+
+    hideProgress() {
+        document.getElementById('progressContainer').style.display = 'none';
+    }
+
+    showToolExecution(data) {
+        const container = document.getElementById('messagesContainer');
+        const toolDiv = document.createElement('div');
+        toolDiv.className = 'tool-indicator executing';
+        toolDiv.innerHTML = `
+            <i class="fas fa-cog"></i>
+            <span>Executing ${data.tool_name}...</span>
+        `;
+        container.appendChild(toolDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    showToolResult(data) {
+        const indicators = document.querySelectorAll('.tool-indicator.executing');
+        const lastIndicator = indicators[indicators.length - 1];
+        
+        if (lastIndicator) {
+            lastIndicator.className = 'tool-indicator success';
+            lastIndicator.innerHTML = `
+                <i class="fas fa-check"></i>
+                <span>${data.message}</span>
+            `;
+        }
+    }
+
+    showToolError(data) {
+        const indicators = document.querySelectorAll('.tool-indicator.executing');
+        const lastIndicator = indicators[indicators.length - 1];
+        
+        if (lastIndicator) {
+            lastIndicator.className = 'tool-indicator error';
+            lastIndicator.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>${data.message}</span>
+            `;
+        }
+    }
+
+    showScreenshotsSummary(screenshots) {
+        if (screenshots.length === 0) return;
+
+        const container = document.getElementById('messagesContainer');
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'screenshots-summary';
+        
+        summaryDiv.innerHTML = `
+            <h4><i class="fas fa-images"></i> Screenshots Captured (${screenshots.length})</h4>
+            <div class="screenshots-grid">
+                ${screenshots.map(screenshot => `
+                    <div class="screenshot-thumb" onclick="mcpAssistant.showScreenshot('${screenshot.path}')">
+                        <img src="${screenshot.path}" alt="${screenshot.filename}" loading="lazy">
+                    </div>
+                `).join('')}
+            </div>
+            <button class="btn-secondary" onclick="mcpAssistant.showScreenshotsGallery(${JSON.stringify(screenshots).replace(/"/g, '&quot;')})">
+                <i class="fas fa-expand"></i> View All Screenshots
+            </button>
+        `;
+
+        container.appendChild(summaryDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    showScreenshot(path) {
+        const modal = document.getElementById('imageModal');
+        const img = document.getElementById('modalImage');
+        img.src = path;
+        this.showModal('imageModal');
+    }
+
+    showScreenshotsGallery(screenshots) {
+        const modal = document.getElementById('screenshotsModal');
+        const gallery = document.getElementById('screenshotsGallery');
+        
+        gallery.innerHTML = screenshots.map(screenshot => `
+            <div class="screenshot-item">
+                <img src="${screenshot.path}" alt="${screenshot.filename}" onclick="mcpAssistant.showScreenshot('${screenshot.path}')">
+                <div class="screenshot-info">
+                    <div class="screenshot-name">${screenshot.filename}</div>
+                    <div class="screenshot-date">${new Date(screenshot.created_at).toLocaleString()}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        this.showModal('screenshotsModal');
+    }
+
+    showError(message) {
+        this.showNotification(message, 'error');
+    }
+
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('collapsed');
+        
+        // On mobile, use show/hide instead of collapsed
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle('show');
+        }
+    }
+
+    toggleUserMenu() {
+        const dropdown = document.getElementById('userDropdown');
+        dropdown.classList.toggle('show');
+    }
+
+    closeUserMenu() {
+        document.getElementById('userDropdown').classList.remove('show');
+    }
+
+    changeAvatar() {
+        document.getElementById('avatarInput').click();
+        this.closeUserMenu();
+    }
+
+    handleAvatarChange(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const newAvatarUrl = e.target.result;
+                document.getElementById('avatarImg').src = newAvatarUrl;
+                document.getElementById('dropdownAvatar').src = newAvatarUrl;
+                
+                // In a real app, you would upload this to the server
+                this.showNotification('Avatar updated successfully!', 'success');
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    setMode(mode) {
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+        
+        // Update placeholder text
+        const input = document.getElementById('messageInput');
+        if (mode === 'task') {
+            input.placeholder = 'Describe a task to automate...';
+        } else {
+            input.placeholder = 'Type your message...';
+        }
+    }
+
+    getCurrentMode() {
+        const activeBtn = document.querySelector('.mode-btn.active');
+        return activeBtn ? activeBtn.dataset.mode : 'chat';
+    }
+
+    executeQuickAction(action) {
+        const actions = {
+            screenshot: 'Take a screenshot of the current page',
+            navigate: 'Navigate to a website and analyze its content',
+            research: 'Research a topic and provide a comprehensive analysis',
+            analyze: 'Analyze the current page content and provide insights'
+        };
+        
+        const message = actions[action];
+        if (message) {
+            document.getElementById('messageInput').value = message;
+            this.sendMessage();
+        }
+    }
+
+    useExample(example) {
+        document.getElementById('messageInput').value = example;
+        document.getElementById('messageInput').focus();
+    }
+
+    showExportModal() {
+        this.showModal('exportModal');
+        this.closeUserMenu();
+    }
+
+    async exportConversation(format) {
+        if (!this.currentConversationId) {
+            this.showNotification('No conversation selected', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/conversations/${this.currentConversationId}/export/${format}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.downloadContent(btoa(data.content), data.filename);
+                this.closeModal('exportModal');
+                this.showNotification('Export completed successfully!', 'success');
+            } else {
+                this.showNotification('Export failed', 'error');
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            this.showNotification('Export failed', 'error');
+        }
+    }
+
+    showProgressDetails() {
+        this.showModal('progressModal');
+        // Populate with current progress details
+        document.getElementById('progressDetails').innerHTML = `
+            <div class="progress-step">
+                <i class="fas fa-check-circle"></i>
+                <span>Connection established</span>
+            </div>
+            <div class="progress-step active">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Processing request...</span>
+            </div>
+            <div class="progress-step">
+                <i class="fas fa-circle"></i>
+                <span>Generating response</span>
+            </div>
+        `;
+    }
+
+    showModal(modalId) {
+        document.getElementById('modalOverlay').classList.add('show');
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.style.display = modal.id === modalId ? 'flex' : 'none';
+        });
+    }
+
+    closeModal(modalId) {
+        if (modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        document.getElementById('modalOverlay').classList.remove('show');
+    }
+
+    closeAllModals() {
+        document.getElementById('modalOverlay').classList.remove('show');
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.style.display = 'none';
+        });
+    }
+
+    clearMessages() {
+        const container = document.getElementById('messagesContainer');
+        container.innerHTML = '<div class="welcome-message" id="welcomeMessage" style="display: block;">...</div>';
+    }
+
+    updateChatTitle(title) {
+        document.getElementById('chatTitle').textContent = title;
+    }
+
+    updateConnectionStatus(status, type) {
+        const statusElement = document.getElementById('connectionStatus');
+        const dot = statusElement.querySelector('.status-dot');
+        const text = statusElement.querySelector('span');
+        
+        text.textContent = status;
+        dot.className = `status-dot ${type}`;
+    }
+
+    autoResizeTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+
+    setupMarkdownRenderer() {
+        // Configure marked for better markdown rendering
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                sanitize: false
+            });
+        }
+    }
+
+    renderMarkdown(content) {
+        if (typeof marked !== 'undefined') {
+            return marked.parse(content);
+        }
+        
+        // Fallback basic markdown rendering
+        return content
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+    }
+
+    generateSessionId() {
+        return 'session_' + Math.random().toString(36).substr(2, 9);
+    }
+}
+
+// Initialize the application
+const mcpAssistant = new MCPAssistant();
+
+// Add notification styles
+const notificationStyles = `
+    .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: slideInRight 0.3s ease-out;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .notification.success {
+        background: var(--success-color);
+    }
+    
+    .notification.error {
+        background: var(--error-color);
+    }
+    
+    .notification.info {
+        background: var(--primary-color);
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    .progress-step {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0;
+        color: var(--text-secondary);
+    }
+    
+    .progress-step.active {
+        color: var(--primary-color);
+        font-weight: 500;
+    }
+    
+    .progress-step i {
+        width: 16px;
+        text-align: center;
+    }
+    
+    .screenshot-item {
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--border-radius);
+        overflow: hidden;
+    }
+    
+    .screenshot-item img {
+        width: 100%;
+        height: auto;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    
+    .screenshot-item img:hover {
+        transform: scale(1.02);
+    }
+    
+    .screenshot-info {
+        padding: 12px;
+        background: var(--surface-hover);
+    }
+    
+    .screenshot-name {
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+    
+    .screenshot-date {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+`;
+
+// Inject notification styles
+const styleSheet = document.createElement('style');
+styleSheet.textContent = notificationStyles;
+document.head.appendChild(styleSheet);
+</script>
 </body>
 </html>

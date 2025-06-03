@@ -69,6 +69,7 @@ class Permission:
     CLICK = "click"
     SCROLL = "scroll"
     TYPE = "type"
+    DOWNLOAD_TIKTOK = "download_tiktok"
     
     # Advanced permissions
     WRITE_FILE = "write_file"
@@ -86,12 +87,14 @@ ROLE_PERMISSIONS = {
         Permission.NAVIGATE, Permission.SCREENSHOT, Permission.CLICK,
         Permission.SCROLL, Permission.TYPE, Permission.WRITE_FILE,
         Permission.DOWNLOAD_VIDEO, Permission.TRANSLATE,
-        Permission.MANAGE_USERS, Permission.VIEW_LOGS, Permission.MANAGE_SESSIONS
+        Permission.MANAGE_USERS, Permission.VIEW_LOGS, Permission.MANAGE_SESSIONS,
+        Permission.DOWNLOAD_TIKTOK
     ],
     UserRole.USER: [
         Permission.NAVIGATE, Permission.SCREENSHOT, Permission.CLICK,
         Permission.SCROLL, Permission.TYPE, Permission.WRITE_FILE,
-        Permission.TRANSLATE
+        Permission.TRANSLATE,
+        Permission.DOWNLOAD_TIKTOK
     ],
     UserRole.READONLY: [
         Permission.NAVIGATE, Permission.SCREENSHOT
