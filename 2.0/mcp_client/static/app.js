@@ -1,595 +1,1198 @@
-class MCPInterface {
-  constructor() {
-    this.sessionId = this.generateSessionId();
-    this.websocket = null;
-    this.currentMode = "chat";
-    this.isConnected = false;
-    this.messageHistory = [];
+class MCPAssistant {
+    constructor() {
+        this.websocket = null;
+        this.sessionId = null;
+        this.currentConversationId = null;
+        this.isConnected = false;
+        this.isTaskRunning = false;
+        this.currentUser = null;
+        this.authToken = null;
+        
+        this.init();
+    }
 
-    this.initializeElements();
-    this.setupEventListeners();
-    this.connectWebSocket();
-  }
+    init() {
+        this.setupEventListeners();
+        this.checkAuthentication();
+        this.setupMarkdownRenderer();
+    }
 
-  generateSessionId() {
-    return (
-      "session_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now()
-    );
-  }
+    setupEventListeners() {
+        // Login form
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleLogin();
+        });
 
-  initializeElements() {
-    this.elements = {
-      messageInput: document.getElementById("messageInput"),
-      sendBtn: document.getElementById("sendBtn"),
-      messagesContainer: document.getElementById("messagesContainer"),
-      connectionStatus: document.getElementById("connectionStatus"),
-      typingIndicator: document.getElementById("typingIndicator"),
-      chatTitle: document.getElementById("chatTitle"),
-      clearChat: document.getElementById("clearChat"),
-      exportChat: document.getElementById("exportChat"),
-      modalOverlay: document.getElementById("modalOverlay"),
-      modalImage: document.getElementById("modalImage"),
-      closeModal: document.getElementById("closeModal"),
-    };
-  }
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
 
-  setupEventListeners() {
-    // Send message
-    this.elements.sendBtn.addEventListener("click", () => this.sendMessage());
+        // Sidebar toggle
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            this.toggleSidebar();
+        });
 
-    // Enter key handling
-    this.elements.messageInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        this.sendMessage();
-      }
-    });
+        // New chat button
+        document.getElementById('newChatBtn').addEventListener('click', () => {
+            this.createNewConversation();
+        });
 
-    // Auto-resize textarea
-    this.elements.messageInput.addEventListener("input", () => {
-      this.autoResizeTextarea();
-    });
+        // Send message
+        document.getElementById('sendBtn').addEventListener('click', () => {
+            if (this.isTaskRunning) {
+                this.stopExecution();
+            } else {
+                this.sendMessage();
+            }
+        });
 
-    // Mode selector
-    document.querySelectorAll(".mode-btn").forEach((btn) => {
-      btn.addEventListener("click", () => this.switchMode(btn.dataset.mode));
-    });
+        // Message input
+        const messageInput = document.getElementById('messageInput');
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (this.isTaskRunning) {
+                    this.stopExecution();
+                } else {
+                    this.sendMessage();
+                }
+            }
+        });
 
-    // Quick actions
-    document.querySelectorAll(".action-btn").forEach((btn) => {
-      btn.addEventListener("click", () =>
-        this.handleQuickAction(btn.dataset.action)
-      );
-    });
+        // Auto-resize textarea
+        messageInput.addEventListener('input', () => {
+            this.autoResizeTextarea(messageInput);
+        });
 
-    // Example commands
-    document.querySelectorAll(".example-item").forEach((item) => {
-      item.addEventListener("click", () => {
-        this.elements.messageInput.value = item.dataset.example;
-        this.autoResizeTextarea();
-      });
-    });
+        // Mode selector
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.setMode(btn.dataset.mode);
+            });
+        });
 
-    // Chat controls
-    this.elements.clearChat.addEventListener("click", () => this.clearChat());
-    this.elements.exportChat.addEventListener("click", () => this.exportChat());
+        // Quick actions
+        document.querySelectorAll('.action-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.executeQuickAction(btn.dataset.action);
+            });
+        });
 
-    // Modal
-    this.elements.closeModal.addEventListener("click", () => this.closeModal());
-    this.elements.modalOverlay.addEventListener("click", (e) => {
-      if (e.target === this.elements.modalOverlay) this.closeModal();
-    });
-  }
+        // Examples
+        document.querySelectorAll('.example-item').forEach(item => {
+            item.addEventListener('click', () => {
+                this.useExample(item.dataset.example);
+            });
+        });
 
-  connectWebSocket() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws/${this.sessionId}`;
+        // User menu
+        document.getElementById('userAvatar').addEventListener('click', () => {
+            this.toggleUserMenu();
+        });
 
-    this.websocket = new WebSocket(wsUrl);
+        // Change avatar
+        document.getElementById('changeAvatar').addEventListener('click', () => {
+            this.changeAvatar();
+        });
 
-    this.websocket.onopen = () => {
-      this.isConnected = true;
-      this.updateConnectionStatus("Connected", true);
-    };
+        // Export data
+        document.getElementById('exportData').addEventListener('click', () => {
+            this.showExportModal();
+        });
 
-    this.websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      this.handleWebSocketMessage(data);
-    };
+        // Progress details
+        document.getElementById('progressDetailsBtn').addEventListener('click', () => {
+            this.showProgressDetails();
+        });
 
-    this.websocket.onclose = () => {
-      this.isConnected = false;
-      this.updateConnectionStatus("Disconnected", false);
-      this.hideTypingIndicator();
+        // Modal close buttons
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.closeModal(btn.closest('.modal').id);
+            });
+        });
 
-      // Attempt to reconnect after 3 seconds
-      setTimeout(() => {
-        if (!this.isConnected) {
-          this.connectWebSocket();
+        // Export buttons
+        document.querySelectorAll('.export-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.exportConversation(btn.dataset.format);
+            });
+        });
+
+        // Click outside to close modals and dropdowns
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-menu')) {
+                this.closeUserMenu();
+            }
+            if (e.target.classList.contains('modal-overlay')) {
+                this.closeAllModals();
+            }
+        });
+
+        // Avatar file input
+        document.getElementById('avatarInput').addEventListener('change', (e) => {
+            this.handleAvatarChange(e);
+        });
+    }
+
+    async checkAuthentication() {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            this.showLogin();
+            return;
         }
-      }, 3000);
-    };
 
-    this.websocket.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      this.updateConnectionStatus("Connection Error", false);
-    };
-  }
+        try {
+            const response = await fetch('/auth/me', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
 
-  updateConnectionStatus(message, connected) {
-    const statusElement = this.elements.connectionStatus;
-    const dot = statusElement.querySelector(".status-dot");
-    const text = statusElement.querySelector("span");
-
-    text.textContent = message;
-    dot.className = `status-dot ${connected ? "connected" : ""}`;
-  }
-
-  // Ajoutez cette méthode dans la classe MCPInterface pour une meilleure gestion des messages
-
-  handleWebSocketMessage(data) {
-    switch (data.type) {
-      case "typing":
-        this.showTypingIndicator(data.message);
-        break;
-
-      case "assistant_message":
-        this.hideTypingIndicator();
-        this.addMessage("assistant", data.message);
-        break;
-
-      case "assistant_tool_call":
-        this.hideTypingIndicator();
-        this.addMessage("assistant", data.message);
-        // Don't add tool message here - wait for execution feedback
-        break;
-
-      case "tool_executing":
-        this.addOrUpdateToolMessage(
-          data.tool_name,
-          {},
-          "executing",
-          data.message
-        );
-        break;
-
-      case "tool_success":
-        this.updateToolMessage(
-          data.tool_name,
-          "success",
-          data.message,
-          data.result
-        );
-        break;
-
-      case "tool_success_image":
-        this.updateToolMessage(data.tool_name, "success", data.message);
-        this.handleImageResult(data.content);
-        break;
-
-      case "tool_error":
-        this.updateToolMessage(data.tool_name, "error", data.message);
-        break;
-
-      case "task_started":
-        this.hideTypingIndicator();
-        this.addTaskProgress(data.message);
-        break;
-
-      case "task_step":
-        this.updateTaskProgress(data.step, data.message);
-        this.addOrUpdateToolMessage(
-          data.tool_name,
-          data.tool_args,
-          "executing",
-          data.message
-        );
-        break;
-
-      case "task_completed":
-        this.completeTaskProgress(data.steps);
-        if (data.message && data.message !== "Task completed successfully!") {
-          this.addMessage("assistant", data.message);
+            if (response.ok) {
+                const user = await response.json();
+                this.currentUser = user;
+                this.authToken = token;
+                this.showApp();
+                this.loadConversations();
+                this.loadApiLimits();
+                this.connectWebSocket();
+            } else {
+                localStorage.removeItem('auth_token');
+                this.showLogin();
+            }
+        } catch (error) {
+            console.error('Authentication check failed:', error);
+            this.showLogin();
         }
-        break;
-
-      case "system_message":
-        this.addMessage("system", data.message);
-        break;
-
-      case "error":
-        this.hideTypingIndicator();
-        this.addMessage("system", `❌ Error: ${data.message}`, "error");
-        break;
-    }
-  }
-
-  addOrUpdateToolMessage(toolName, args, status, message = "") {
-    // Check if tool message already exists
-    let toolElement = this.elements.messagesContainer.querySelector(
-      `[data-tool-name="${toolName}"]`
-    );
-
-    if (!toolElement) {
-      // Create new tool message
-      this.addToolMessage(toolName, args, status);
-      toolElement = this.elements.messagesContainer.querySelector(
-        `[data-tool-name="${toolName}"]`
-      );
     }
 
-    if (toolElement) {
-      this.updateToolStatus(toolName, status, message);
-    }
-  }
+    async handleLogin() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('loginError');
 
-  updateToolMessage(toolName, status, message, result = null) {
-    const toolElement = this.elements.messagesContainer.querySelector(
-      `[data-tool-name="${toolName}"]`
-    );
-    if (!toolElement) {
-      // Create the tool message if it doesn't exist
-      this.addToolMessage(toolName, {}, status);
-      return this.updateToolStatus(toolName, status, message, result);
-    }
+        try {
+            const response = await fetch('/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
 
-    this.updateToolStatus(toolName, status, message, result);
-  }
-
-  sendMessage() {
-    const message = this.elements.messageInput.value.trim();
-    if (!message || !this.isConnected) return;
-
-    // Add user message to UI
-    this.addMessage("user", message);
-
-    // Clear input
-    this.elements.messageInput.value = "";
-    this.autoResizeTextarea();
-
-    // Send via WebSocket
-    const messageData = {
-      type: this.currentMode,
-      [this.currentMode === "task" ? "task" : "message"]: message,
-    };
-
-    this.websocket.send(JSON.stringify(messageData));
-
-    // Show typing indicator
-    this.showTypingIndicator("Assistant is thinking...");
-  }
-
-  addMessage(sender, content, type = "normal") {
-    const messageDiv = document.createElement("div");
-    messageDiv.className = `message ${sender}-message`;
-
-    const time = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    const avatarIcon =
-      {
-        user: "fas fa-user",
-        assistant: "fas fa-robot",
-        system: "fas fa-cog",
-      }[sender] || "fas fa-circle";
-
-    const senderName =
-      {
-        user: "You",
-        assistant: "Assistant",
-        system: "System",
-      }[sender] || sender;
-
-    messageDiv.innerHTML = `
-            <div class="message-header">
-                <div class="message-avatar ${sender}-avatar">
-                    <i class="${avatarIcon}"></i>
-                </div>
-                <div class="message-info">
-                    <div class="message-sender">${senderName}</div>
-                    <div class="message-time">${time}</div>
-                </div>
-            </div>
-            <div class="message-content">
-                ${this.formatMessageContent(content)}
-            </div>
-        `;
-
-    // Remove welcome message if it exists
-    const welcomeMessage =
-      this.elements.messagesContainer.querySelector(".welcome-message");
-    if (welcomeMessage) {
-      welcomeMessage.remove();
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('auth_token', data.access_token);
+                this.currentUser = data.user;
+                this.authToken = data.access_token;
+                this.showApp();
+                this.loadConversations();
+                this.loadApiLimits();
+                this.connectWebSocket();
+            } else {
+                const error = await response.json();
+                errorDiv.textContent = error.detail || 'Login failed';
+                errorDiv.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            errorDiv.textContent = 'Connection error. Please try again.';
+            errorDiv.style.display = 'block';
+        }
     }
 
-    this.elements.messagesContainer.appendChild(messageDiv);
-    this.scrollToBottom();
-
-    // Store in history
-    this.messageHistory.push({
-      sender,
-      content,
-      timestamp: new Date().toISOString(),
-      type,
-    });
-  }
-
-  formatMessageContent(content) {
-    // Convert markdown-like formatting
-    content = content
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`(.*?)`/g, "<code>$1</code>")
-      .replace(/\n/g, "<br>");
-
-    // Convert URLs to links
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    content = content.replace(
-      urlRegex,
-      '<a href="$1" target="_blank" rel="noopener">$1</a>'
-    );
-
-    return content;
-  }
-
-  addToolMessage(toolName, args, status) {
-    const toolDiv = document.createElement("div");
-    toolDiv.className = "tool-message";
-    toolDiv.dataset.toolName = toolName;
-
-    const statusText =
-      {
-        preparing: "Preparing",
-        executing: "Executing",
-        success: "Completed",
-        error: "Failed",
-      }[status] || status;
-
-    const argsText =
-      Object.keys(args).length > 0
-        ? Object.entries(args)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join(", ")
-        : "No parameters";
-
-    toolDiv.innerHTML = `
-            <div class="tool-header">
-                <div class="tool-icon">
-                    <i class="fas fa-cog"></i>
-                </div>
-                <div class="tool-name">${toolName}</div>
-                <div class="tool-status ${status}">${statusText}</div>
-            </div>
-            <div class="tool-result">
-                <strong>Parameters:</strong> ${argsText}
-                <div class="tool-output"></div>
-            </div>
-        `;
-
-    this.elements.messagesContainer.appendChild(toolDiv);
-    this.scrollToBottom();
-  }
-
-  updateToolStatus(toolName, status, message, result = null) {
-    const toolElement = this.elements.messagesContainer.querySelector(
-      `[data-tool-name="${toolName}"]`
-    );
-    if (!toolElement) return;
-
-    const statusElement = toolElement.querySelector(".tool-status");
-    const outputElement = toolElement.querySelector(".tool-output");
-
-    const statusText =
-      {
-        executing: "Executing",
-        success: "Completed",
-        error: "Failed",
-      }[status] || status;
-
-    statusElement.className = `tool-status ${status}`;
-    statusElement.textContent = statusText;
-
-    if (result) {
-      outputElement.innerHTML = `<br><strong>Result:</strong> ${result}`;
-    } else if (message) {
-      outputElement.innerHTML = `<br><strong>Status:</strong> ${message}`;
+    logout() {
+        localStorage.removeItem('auth_token');
+        this.currentUser = null;
+        this.authToken = null;
+        if (this.websocket) {
+            this.websocket.close();
+        }
+        this.showLogin();
     }
 
-    this.scrollToBottom();
-  }
-
-  addTaskProgress(message) {
-    const progressDiv = document.createElement("div");
-    progressDiv.className = "task-progress";
-    progressDiv.id = "currentTaskProgress";
-
-    progressDiv.innerHTML = `
-            <div class="progress-header">
-                <div class="progress-title">Task Execution</div>
-                <div class="progress-steps">Step <span class="current-step-num">0</span> of <span class="total-steps">?</span></div>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: 0%"></div>
-            </div>
-            <div class="current-step">${message}</div>
-        `;
-
-    this.elements.messagesContainer.appendChild(progressDiv);
-    this.scrollToBottom();
-  }
-
-  updateTaskProgress(step, message) {
-    const progressElement = document.getElementById("currentTaskProgress");
-    if (!progressElement) return;
-
-    const currentStepNum = progressElement.querySelector(".current-step-num");
-    const currentStepText = progressElement.querySelector(".current-step");
-    const progressFill = progressElement.querySelector(".progress-fill");
-
-    currentStepNum.textContent = step;
-    currentStepText.textContent = message;
-
-    // Estimate progress (assuming max 20 steps)
-    const progress = Math.min((step / 20) * 100, 95);
-    progressFill.style.width = `${progress}%`;
-
-    this.scrollToBottom();
-  }
-
-  completeTaskProgress(totalSteps) {
-    const progressElement = document.getElementById("currentTaskProgress");
-    if (!progressElement) return;
-
-    const totalStepsElement = progressElement.querySelector(".total-steps");
-    const progressFill = progressElement.querySelector(".progress-fill");
-    const currentStepText = progressElement.querySelector(".current-step");
-
-    totalStepsElement.textContent = totalSteps;
-    progressFill.style.width = "100%";
-    currentStepText.textContent = `Task completed in ${totalSteps} steps`;
-
-    this.scrollToBottom();
-  }
-
-  handleImageResult(content) {
-    // Find image data in content
-    for (const item of content) {
-      if (item.image) {
-        const imageDiv = document.createElement("div");
-        imageDiv.className = "message-image";
-        imageDiv.innerHTML = `
-                    <img src="data:image/${item.image.format};base64,${item.image.data}" 
-                         alt="Screenshot" 
-                         style="max-width: 300px; border-radius: 8px; cursor: pointer;"
-                         onclick="mcpInterface.showImageModal(this.src)">
-                `;
-
-        this.elements.messagesContainer.appendChild(imageDiv);
-        this.scrollToBottom();
-        break;
-      }
+    showLogin() {
+        document.getElementById('loginContainer').style.display = 'flex';
+        document.getElementById('appContainer').style.display = 'none';
     }
-  }
 
-  showImageModal(src) {
-    this.elements.modalImage.src = src;
-    this.elements.modalOverlay.classList.add("show");
-  }
-
-  closeModal() {
-    this.elements.modalOverlay.classList.remove("show");
-  }
-
-  showTypingIndicator(message = "Assistant is thinking...") {
-    this.elements.typingIndicator.querySelector("span:last-child").textContent =
-      message;
-    this.elements.typingIndicator.classList.add("show");
-  }
-
-  hideTypingIndicator() {
-    this.elements.typingIndicator.classList.remove("show");
-  }
-
-  switchMode(mode) {
-    this.currentMode = mode;
-
-    // Update UI
-    document.querySelectorAll(".mode-btn").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.mode === mode);
-    });
-
-    // Update title and placeholder
-    if (mode === "task") {
-      this.elements.chatTitle.textContent = "Task Automation Assistant";
-      this.elements.messageInput.placeholder =
-        "Describe a complex task to automate...";
-    } else {
-      this.elements.chatTitle.textContent = "Intelligent Web Assistant";
-      this.elements.messageInput.placeholder =
-        "Type your message or ask a question...";
+    showApp() {
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('appContainer').style.display = 'flex';
+        
+        // Update user info
+        if (this.currentUser) {
+            document.getElementById('username').textContent = this.currentUser.username;
+            document.getElementById('avatarImg').src = this.currentUser.avatar;
+            document.getElementById('dropdownAvatar').src = this.currentUser.avatar;
+        }
     }
-  }
 
-  handleQuickAction(action) {
-    const actions = {
-      screenshot: "Take a screenshot of the current page",
-      navigate: "Navigate to https://example.com",
-      research: "Research the latest trends in artificial intelligence",
-      analyze: "Analyze the current page content and provide insights",
-    };
+    connectWebSocket() {
+        this.sessionId = this.generateSessionId();
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/${this.sessionId}`;
 
-    if (actions[action]) {
-      this.elements.messageInput.value = actions[action];
-      this.autoResizeTextarea();
+        this.websocket = new WebSocket(wsUrl);
+
+        this.websocket.onopen = () => {
+            this.isConnected = true;
+            this.updateConnectionStatus('Connected', 'connected');
+        };
+
+        this.websocket.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            this.handleWebSocketMessage(message);
+        };
+
+        this.websocket.onclose = () => {
+            this.isConnected = false;
+            this.updateConnectionStatus('Disconnected', 'disconnected');
+            
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+                if (!this.isConnected) {
+                    this.connectWebSocket();
+                }
+            }, 3000);
+        };
+
+        this.websocket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.updateConnectionStatus('Error', 'error');
+        };
     }
-  }
 
-  autoResizeTextarea() {
-    const textarea = this.elements.messageInput;
-    textarea.style.height = "auto";
-    textarea.style.height = Math.min(textarea.scrollHeight, 120) + "px";
-  }
-
-  clearChat() {
-    this.elements.messagesContainer.innerHTML = `
-            <div class="welcome-message">
-                <div class="welcome-icon">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <h2>Welcome to MCP Advanced Assistant</h2>
-                <p>Your intelligent web automation and research companion. Choose a mode and start your conversation.</p>
-                <div class="welcome-features">
-                    <div class="feature">
-                        <i class="fas fa-globe"></i>
-                        <span>Web Navigation</span>
-                    </div>
-                    <div class="feature">
-                        <i class="fas fa-search"></i>
-                        <span>Research & Analysis</span>
-                    </div>
-                    <div class="feature">
-                        <i class="fas fa-cogs"></i>
-                        <span>Task Automation</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    this.messageHistory = [];
-  }
-
-  exportChat() {
-    const chatData = {
-      sessionId: this.sessionId,
-      timestamp: new Date().toISOString(),
-      messages: this.messageHistory,
-    };
-
-    const blob = new Blob([JSON.stringify(chatData, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mcp-chat-${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    URL.revokeObjectURL(url);
-  }
-
-  scrollToBottom() {
-    setTimeout(() => {
-      this.elements.messagesContainer.scrollTop =
-        this.elements.messagesContainer.scrollHeight;
-    }, 100);
-  }
+    handleWebSocketMessage(message) {
+    switch (message.type) {
+        case 'progress_update':
+            this.updateProgress(message);
+            break;
+        case 'task_completed':
+            this.hideProgress();
+            this.setTaskRunning(false);
+            if (message.final) {
+                this.showTaskResult(message);
+            }
+            break;
+        case 'assistant_message':
+            // Ne pas afficher les messages intermédiaires pendant l'exécution de tâches
+            if (!this.isTaskRunning) {
+                this.addMessage('assistant', message.message, message);
+            }
+            break;
+        case 'task_started':
+            this.setTaskRunning(true);
+            this.showProgress('Starting task...', 0);
+            break;
+        case 'execution_stopped':
+            this.hideProgress();
+            this.setTaskRunning(false);
+            this.addMessage('system', message.message, message);
+            break;
+        case 'error':
+            this.showError(message.message);
+            this.setTaskRunning(false);
+            break;
+    }
 }
 
-// Initialize the interface when the page loads
-document.addEventListener("DOMContentLoaded", () => {
-  window.mcpInterface = new MCPInterface();
-});
+showTaskResult(message) {
+    // """Afficher le résultat final de la tâche avec screenshots et fichiers"""
+    const container = document.getElementById('messagesContainer');
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    
+    if (welcomeMessage) {
+        welcomeMessage.style.display = 'none';
+    }
+
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'message assistant task-result';
+    
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Traiter le contenu du message
+    let processedContent = this.renderMarkdown(message.message);
+    
+    // Créer la section des screenshots si disponibles
+    let screenshotsSection = '';
+    if (message.screenshots && message.screenshots.length > 0) {
+        screenshotsSection = `
+            <div class="screenshots-section">
+                <h4><i class="fas fa-images"></i> Screenshots Captured (${message.screenshots.length})</h4>
+                <div class="screenshots-grid">
+                    ${message.screenshots.map((screenshot, index) => `
+                        <div class="screenshot-item" onclick="mcpAssistant.showScreenshotModal('${screenshot.data}', '${screenshot.format}')">
+                            <img src="data:image/${screenshot.format};base64,${screenshot.data}" 
+                                 alt="Screenshot ${index + 1}" loading="lazy">
+                            <div class="screenshot-caption">Step ${screenshot.step}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Vérifier s'il y a des fichiers créés
+    let filesSection = '';
+    if (message.files_created && message.files_created.length > 0) {
+        filesSection = `
+            <div class="files-section">
+                <h4><i class="fas fa-file"></i> Files Created</h4>
+                <div class="files-list">
+                    ${message.files_created.map(file => `
+                        <div class="file-item">
+                            <div class="file-info">
+                                <i class="fas fa-file-alt"></i>
+                                <span class="file-name">${file.filename}</span>
+                            </div>
+                            <div class="file-actions">
+                                <button class="btn-small" onclick="mcpAssistant.downloadFile('${file.uri}', '${file.filename}')">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                                <button class="btn-small" onclick="mcpAssistant.previewFile('${file.uri}', '${file.filename}')">
+                                    <i class="fas fa-eye"></i> Preview
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    resultDiv.innerHTML = `
+        <div class="message-header">
+            <div class="message-avatar">A</div>
+            <div class="message-info">
+                <div class="message-sender">Assistant</div>
+                <div class="message-time">${timestamp}</div>
+            </div>
+        </div>
+        <div class="message-content task-result-content">
+            <div class="task-summary">
+                <i class="fas fa-check-circle text-success"></i>
+                <span>Task completed in ${message.steps} steps</span>
+            </div>
+            
+            ${this.createResultPreview(processedContent)}
+            
+            ${screenshotsSection}
+            ${filesSection}
+            
+            <div class="result-actions">
+                <button class="btn-secondary" onclick="mcpAssistant.exportTaskResult('${btoa(JSON.stringify(message))}')">
+                    <i class="fas fa-download"></i> Export Complete Result
+                </button>
+                <button class="btn-secondary" onclick="mcpAssistant.shareTaskResult('${message.conversation_id}')">
+                    <i class="fas fa-share"></i> Share
+                </button>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(resultDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+showScreenshotModal(imageData, format) {
+    // """Afficher une capture d'écran en modal"""
+    const modal = document.getElementById('imageModal');
+    const img = document.getElementById('modalImage');
+    img.src = `data:image/${format};base64,${imageData}`;
+    this.showModal('imageModal');
+}
+
+async downloadFile(uri, filename) {
+    // """Télécharger un fichier créé"""
+    try {
+        const response = await fetch(uri, {
+            headers: {
+                'Authorization': `Bearer ${this.authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const content = await response.text();
+            this.downloadContent(btoa(content), filename);
+        } else {
+            this.showNotification('Failed to download file', 'error');
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        this.showNotification('Download failed', 'error');
+    }
+}
+
+async previewFile(uri, filename) {
+    // """Prévisualiser un fichier créé"""
+    try {
+        const response = await fetch(uri, {
+            headers: {
+                'Authorization': `Bearer ${this.authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const content = await response.text();
+            const modal = document.getElementById('resultModal');
+            const contentDiv = document.getElementById('resultContent');
+            
+            // Déterminer le type de contenu et l'afficher approprié
+            if (filename.endsWith('.md')) {
+                contentDiv.innerHTML = this.renderMarkdown(content);
+            } else if (filename.endsWith('.html')) {
+                contentDiv.innerHTML = content;
+            } else if (filename.endsWith('.json')) {
+                contentDiv.innerHTML = `<pre><code class="language-json">${JSON.stringify(JSON.parse(content), null, 2)}</code></pre>`;
+            } else {
+                contentDiv.innerHTML = `<pre><code>${content}</code></pre>`;
+            }
+            
+            this.showModal('resultModal');
+            
+            // Setup download button
+            document.getElementById('downloadResult').onclick = () => {
+                this.downloadContent(btoa(content), filename);
+            };
+        } else {
+            this.showNotification('Failed to preview file', 'error');
+        }
+    } catch (error) {
+        console.error('Preview error:', error);
+        this.showNotification('Preview failed', 'error');
+    }
+}
+
+exportTaskResult(encodedResult) {
+    // """Exporter le résultat complet de la tâche"""
+    const result = JSON.parse(atob(encodedResult));
+    
+    // Créer un rapport complet
+    let report = `# Task Execution Report\n\n`;
+    report += `**Completed:** ${new Date().toLocaleString()}\n`;
+    report += `**Steps:** ${result.steps}\n\n`;
+    report += `## Result\n\n${result.message}\n\n`;
+    
+    if (result.screenshots && result.screenshots.length > 0) {
+        report += `## Screenshots (${result.screenshots.length})\n\n`;
+        result.screenshots.forEach((screenshot, index) => {
+            report += `- Screenshot ${index + 1} (Step ${screenshot.step})\n`;
+        });
+        report += `\n`;
+    }
+    
+    if (result.files_created && result.files_created.length > 0) {
+        report += `## Files Created\n\n`;
+        result.files_created.forEach(file => {
+            report += `- ${file.filename}\n`;
+        });
+    }
+    
+    this.downloadContent(btoa(report), `task_report_${Date.now()}.md`);
+}
+    async loadConversations() {
+        try {
+            const response = await fetch('/conversations', {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.renderConversations(data.conversations);
+            }
+        } catch (error) {
+            console.error('Failed to load conversations:', error);
+        }
+    }
+
+    async loadApiLimits() {
+        try {
+            const response = await fetch('/api/limits', {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('remainingCalls').textContent = `${data.remaining_calls} calls remaining`;
+            }
+        } catch (error) {
+            console.error('Failed to load API limits:', error);
+        }
+    }
+
+    renderConversations(conversations) {
+        const container = document.getElementById('conversationsList');
+        container.innerHTML = '';
+
+        conversations.forEach(conv => {
+            const item = document.createElement('div');
+            item.className = 'conversation-item';
+            item.dataset.conversationId = conv.id;
+            
+            item.innerHTML = `
+                <div class="conversation-title">${conv.title}</div>
+                <div class="conversation-date">${new Date(conv.updated_at).toLocaleDateString()}</div>
+            `;
+
+            item.addEventListener('click', () => {
+                this.loadConversation(conv.id);
+            });
+
+            container.appendChild(item);
+        });
+    }
+
+    async createNewConversation() {
+        try {
+            const response = await fetch('/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
+                },
+                body: JSON.stringify({
+                    title: `New Conversation ${new Date().toLocaleDateString()}`
+                })
+            });
+
+            if (response.ok) {
+                const conversation = await response.json();
+                this.currentConversationId = conversation.id;
+                this.clearMessages();
+                this.loadConversations();
+                this.updateChatTitle(conversation.title);
+            }
+        } catch (error) {
+            console.error('Failed to create conversation:', error);
+        }
+    }
+
+    async loadConversation(conversationId) {
+        try {
+            const response = await fetch(`/conversations/${conversationId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                const conversation = await response.json();
+                this.currentConversationId = conversationId;
+                this.clearMessages();
+                this.updateChatTitle(conversation.title);
+                
+                // Load messages
+                conversation.messages.forEach(msg => {
+                    this.addMessage(msg.role, msg.content, { conversation_id: conversationId });
+                });
+
+                // Update active conversation
+                document.querySelectorAll('.conversation-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                document.querySelector(`[data-conversation-id="${conversationId}"]`)?.classList.add('active');
+            }
+        } catch (error) {
+            console.error('Failed to load conversation:', error);
+        }
+    }
+
+    sendMessage() {
+        const input = document.getElementById('messageInput');
+        const message = input.value.trim();
+
+        if (!message || !this.isConnected) return;
+
+        // Add user message to UI
+        this.addMessage('user', message);
+        input.value = '';
+        this.autoResizeTextarea(input);
+
+        // Send to WebSocket
+        const messageData = {
+            type: this.getCurrentMode() === 'task' ? 'task' : 'chat',
+            message: message,
+            conversation_id: this.currentConversationId
+        };
+
+        this.websocket.send(JSON.stringify(messageData));
+        this.setTaskRunning(true);
+        this.showProgress('Processing your request...', 10);
+    }
+
+    stopExecution() {
+        if (this.websocket && this.isTaskRunning) {
+            this.websocket.send(JSON.stringify({
+                type: 'stop_execution'
+            }));
+        }
+    }
+
+    setTaskRunning(isRunning) {
+        this.isTaskRunning = isRunning;
+        const sendBtn = document.getElementById('sendBtn');
+        
+        if (isRunning) {
+            sendBtn.classList.add('stop');
+            sendBtn.innerHTML = '<i class="fas fa-stop"></i>';
+            sendBtn.title = 'Stop execution';
+        } else {
+            sendBtn.classList.remove('stop');
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+            sendBtn.title = 'Send message';
+        }
+    }
+
+   // Simplifier l'affichage des messages pendant l'exécution
+addMessage(role, content, metadata = {}) {
+    // Ne pas afficher les messages intermédiaires pendant l'exécution de tâches
+    if (this.isTaskRunning && role === 'assistant' && !metadata.final) {
+        return;
+    }
+    
+    const container = document.getElementById('messagesContainer');
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    
+    if (welcomeMessage) {
+        welcomeMessage.style.display = 'none';
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    const avatarIcon = role === 'user' ? 'U' : 
+                      role === 'assistant' ? 'A' : 'S';
+    
+    const timestamp = new Date().toLocaleTimeString();
+    
+    let processedContent = content;
+    if (typeof content === 'string') {
+        processedContent = this.renderMarkdown(content);
+    }
+
+    messageDiv.innerHTML = `
+        <div class="message-header">
+            <div class="message-avatar">${avatarIcon}</div>
+            <div class="message-info">
+                <div class="message-sender">${role.charAt(0).toUpperCase() + role.slice(1)}</div>
+                <div class="message-time">${timestamp}</div>
+            </div>
+        </div>
+        <div class="message-content">
+            ${this.createResultPreview(processedContent)}
+            ${this.createMessageActions(role, content, metadata)}
+        </div>
+    `;
+
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+    createResultPreview(content) {
+        const maxLength = 1000;
+        if (content.length > maxLength) {
+            return `
+                <div class="result-preview truncated">
+                    ${content.substring(0, maxLength)}...
+                </div>
+                <button class="show-more-btn" onclick="mcpAssistant.showFullResult('${btoa(content)}')">
+                    <i class="fas fa-expand-alt"></i> Show Full Result
+                </button>
+            `;
+        }
+        return content;
+    }
+
+    createMessageActions(role, content, metadata) {
+        if (role === 'assistant') {
+            return `
+                <div class="message-actions">
+                    <button class="message-action" onclick="mcpAssistant.copyToClipboard('${btoa(content)}')">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <button class="message-action" onclick="mcpAssistant.downloadContent('${btoa(content)}', 'result.md')">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            `;
+        }
+        return '';
+    }
+
+    showFullResult(encodedContent) {
+        const content = atob(encodedContent);
+        const modal = document.getElementById('resultModal');
+        const contentDiv = document.getElementById('resultContent');
+        
+        contentDiv.innerHTML = this.renderMarkdown(content);
+        this.showModal('resultModal');
+        
+        // Setup download button
+        document.getElementById('downloadResult').onclick = () => {
+            this.downloadContent(encodedContent, 'full_result.md');
+        };
+    }
+
+    copyToClipboard(encodedContent) {
+        const content = atob(encodedContent);
+        navigator.clipboard.writeText(content).then(() => {
+            this.showNotification('Content copied to clipboard!', 'success');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            this.showNotification('Failed to copy content', 'error');
+        });
+    }
+
+    downloadContent(encodedContent, filename) {
+        const content = atob(encodedContent);
+        const blob = new Blob([content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    showProgress(message, progress) {
+        const container = document.getElementById('progressContainer');
+        const fill = document.getElementById('progressFill');
+        const messageSpan = document.getElementById('progressMessage');
+        
+        container.style.display = 'block';
+        fill.style.width = `${progress}%`;
+        messageSpan.textContent = message;
+    }
+
+    updateProgress(data) {
+        this.showProgress(data.message, data.progress || 0);
+    }
+
+    hideProgress() {
+        document.getElementById('progressContainer').style.display = 'none';
+    }
+
+    showToolExecution(data) {
+        const container = document.getElementById('messagesContainer');
+        const toolDiv = document.createElement('div');
+        toolDiv.className = 'tool-indicator executing';
+        toolDiv.innerHTML = `
+            <i class="fas fa-cog"></i>
+            <span>Executing ${data.tool_name}...</span>
+        `;
+        container.appendChild(toolDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    showToolResult(data) {
+        const indicators = document.querySelectorAll('.tool-indicator.executing');
+        const lastIndicator = indicators[indicators.length - 1];
+        
+        if (lastIndicator) {
+            lastIndicator.className = 'tool-indicator success';
+            lastIndicator.innerHTML = `
+                <i class="fas fa-check"></i>
+                <span>${data.message}</span>
+            `;
+        }
+    }
+
+    showToolError(data) {
+        const indicators = document.querySelectorAll('.tool-indicator.executing');
+        const lastIndicator = indicators[indicators.length - 1];
+        
+        if (lastIndicator) {
+            lastIndicator.className = 'tool-indicator error';
+            lastIndicator.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>${data.message}</span>
+            `;
+        }
+    }
+
+    showScreenshotsSummary(screenshots) {
+        if (screenshots.length === 0) return;
+
+        const container = document.getElementById('messagesContainer');
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'screenshots-summary';
+        
+        summaryDiv.innerHTML = `
+            <h4><i class="fas fa-images"></i> Screenshots Captured (${screenshots.length})</h4>
+            <div class="screenshots-grid">
+                ${screenshots.map(screenshot => `
+                    <div class="screenshot-thumb" onclick="mcpAssistant.showScreenshot('${screenshot.path}')">
+                        <img src="${screenshot.path}" alt="${screenshot.filename}" loading="lazy">
+                    </div>
+                `).join('')}
+            </div>
+            <button class="btn-secondary" onclick="mcpAssistant.showScreenshotsGallery(${JSON.stringify(screenshots).replace(/"/g, '&quot;')})">
+                <i class="fas fa-expand"></i> View All Screenshots
+            </button>
+        `;
+
+        container.appendChild(summaryDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    showScreenshot(path) {
+        const modal = document.getElementById('imageModal');
+        const img = document.getElementById('modalImage');
+        img.src = path;
+        this.showModal('imageModal');
+    }
+
+    showScreenshotsGallery(screenshots) {
+        const modal = document.getElementById('screenshotsModal');
+        const gallery = document.getElementById('screenshotsGallery');
+        
+        gallery.innerHTML = screenshots.map(screenshot => `
+            <div class="screenshot-item">
+                <img src="${screenshot.path}" alt="${screenshot.filename}" onclick="mcpAssistant.showScreenshot('${screenshot.path}')">
+                <div class="screenshot-info">
+                    <div class="screenshot-name">${screenshot.filename}</div>
+                    <div class="screenshot-date">${new Date(screenshot.created_at).toLocaleString()}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        this.showModal('screenshotsModal');
+    }
+
+    showError(message) {
+        this.showNotification(message, 'error');
+    }
+
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('collapsed');
+        
+        // On mobile, use show/hide instead of collapsed
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle('show');
+        }
+    }
+
+    toggleUserMenu() {
+        const dropdown = document.getElementById('userDropdown');
+        dropdown.classList.toggle('show');
+    }
+
+    closeUserMenu() {
+        document.getElementById('userDropdown').classList.remove('show');
+    }
+
+    changeAvatar() {
+        document.getElementById('avatarInput').click();
+        this.closeUserMenu();
+    }
+
+    handleAvatarChange(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const newAvatarUrl = e.target.result;
+                document.getElementById('avatarImg').src = newAvatarUrl;
+                document.getElementById('dropdownAvatar').src = newAvatarUrl;
+                
+                // In a real app, you would upload this to the server
+                this.showNotification('Avatar updated successfully!', 'success');
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    setMode(mode) {
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+        
+        // Update placeholder text
+        const input = document.getElementById('messageInput');
+        if (mode === 'task') {
+            input.placeholder = 'Describe a task to automate...';
+        } else {
+            input.placeholder = 'Type your message...';
+        }
+    }
+
+    getCurrentMode() {
+        const activeBtn = document.querySelector('.mode-btn.active');
+        return activeBtn ? activeBtn.dataset.mode : 'chat';
+    }
+
+    executeQuickAction(action) {
+        const actions = {
+            screenshot: 'Take a screenshot of the current page',
+            navigate: 'Navigate to a website and analyze its content',
+            research: 'Research a topic and provide a comprehensive analysis',
+            analyze: 'Analyze the current page content and provide insights'
+        };
+        
+        const message = actions[action];
+        if (message) {
+            document.getElementById('messageInput').value = message;
+            this.sendMessage();
+        }
+    }
+
+    useExample(example) {
+        document.getElementById('messageInput').value = example;
+        document.getElementById('messageInput').focus();
+    }
+
+    showExportModal() {
+        this.showModal('exportModal');
+        this.closeUserMenu();
+    }
+
+    async exportConversation(format) {
+        if (!this.currentConversationId) {
+            this.showNotification('No conversation selected', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/conversations/${this.currentConversationId}/export/${format}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.downloadContent(btoa(data.content), data.filename);
+                this.closeModal('exportModal');
+                this.showNotification('Export completed successfully!', 'success');
+            } else {
+                this.showNotification('Export failed', 'error');
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            this.showNotification('Export failed', 'error');
+        }
+    }
+
+    showProgressDetails() {
+        this.showModal('progressModal');
+        // Populate with current progress details
+        document.getElementById('progressDetails').innerHTML = `
+            <div class="progress-step">
+                <i class="fas fa-check-circle"></i>
+                <span>Connection established</span>
+            </div>
+            <div class="progress-step active">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Processing request...</span>
+            </div>
+            <div class="progress-step">
+                <i class="fas fa-circle"></i>
+                <span>Generating response</span>
+            </div>
+        `;
+    }
+
+    showModal(modalId) {
+        document.getElementById('modalOverlay').classList.add('show');
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.style.display = modal.id === modalId ? 'flex' : 'none';
+        });
+    }
+
+    closeModal(modalId) {
+        if (modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        document.getElementById('modalOverlay').classList.remove('show');
+    }
+
+    closeAllModals() {
+        document.getElementById('modalOverlay').classList.remove('show');
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.style.display = 'none';
+        });
+    }
+
+    clearMessages() {
+        const container = document.getElementById('messagesContainer');
+        container.innerHTML = '<div class="welcome-message" id="welcomeMessage" style="display: block;">...</div>';
+    }
+
+    updateChatTitle(title) {
+        document.getElementById('chatTitle').textContent = title;
+    }
+
+    updateConnectionStatus(status, type) {
+        const statusElement = document.getElementById('connectionStatus');
+        const dot = statusElement.querySelector('.status-dot');
+        const text = statusElement.querySelector('span');
+        
+        text.textContent = status;
+        dot.className = `status-dot ${type}`;
+    }
+
+    autoResizeTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+
+    setupMarkdownRenderer() {
+        // Configure marked for better markdown rendering
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                sanitize: false
+            });
+        }
+    }
+
+    renderMarkdown(content) {
+        if (typeof marked !== 'undefined') {
+            return marked.parse(content);
+        }
+        
+        // Fallback basic markdown rendering
+        return content
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+    }
+
+    generateSessionId() {
+        return 'session_' + Math.random().toString(36).substr(2, 9);
+    }
+}
+
+// Initialize the application
+const mcpAssistant = new MCPAssistant();
+
+// Add notification styles
+const notificationStyles = `
+    .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: slideInRight 0.3s ease-out;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .notification.success {
+        background: var(--success-color);
+    }
+    
+    .notification.error {
+        background: var(--error-color);
+    }
+    
+    .notification.info {
+        background: var(--primary-color);
+    }
+    
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    .progress-step {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0;
+        color: var(--text-secondary);
+    }
+    
+    .progress-step.active {
+        color: var(--primary-color);
+        font-weight: 500;
+    }
+    
+    .progress-step i {
+        width: 16px;
+        text-align: center;
+    }
+    
+    .screenshot-item {
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--border-radius);
+        overflow: hidden;
+    }
+    
+    .screenshot-item img {
+        width: 100%;
+        height: auto;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    
+    .screenshot-item img:hover {
+        transform: scale(1.02);
+    }
+    
+    .screenshot-info {
+        padding: 12px;
+        background: var(--surface-hover);
+    }
+    
+    .screenshot-name {
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+    
+    .screenshot-date {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+`;
+
+// Inject notification styles
+const styleSheet = document.createElement('style');
+styleSheet.textContent = notificationStyles;
+document.head.appendChild(styleSheet);
