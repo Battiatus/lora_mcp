@@ -31,6 +31,7 @@ const listTools = async (req, res) => {
      *           type: object
      *           description: Schéma des arguments de l'outil
      */
+
     const tools = [
       {
         name: 'navigate',
