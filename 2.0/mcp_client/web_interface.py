@@ -26,11 +26,13 @@ from pydantic import BaseModel
 import uvicorn
 import jwt
 from passlib.context import CryptContext
-
-import sys, os
+from dotenv import load_dotenv
+load_dotenv()
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from main import ChatSession, HTTPServer, LLMClient, Configuration
+
+print (os.getenv("GOOGLE_CLOUD_PROJECT"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,16 +43,17 @@ SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
 
+
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
-
+print(os.getenv("ADMIN_PASSWORD"))
 # User credentials (in production, use a proper database)
 USERS_DB = {
     "admin": {
         "username": "admin",
-        "hashed_password": pwd_context.hash(os.getenv("ADMIN_PASSWORD", "secure_password_123")),
-        "avatar": "/static/default-avatar.png"
+        "hashed_password": pwd_context.hash(os.getenv("ADMIN_PASSWORD")),
+        "avatar": "/avatar"
     }
 }
 
@@ -356,6 +359,19 @@ async def get_or_create_chat_session(session_id: str) -> ChatSession:
     return chat_sessions[session_id]
 
 # Routes
+app.get("/app.js")
+async def get_app():
+    """Serve the JavaScript scripts"""
+    return FileResponse("static/app.js")
+@app.get("/styles.css")
+async def get_styles():
+    """Serve the CSS styles"""
+    return FileResponse("static/styles.css")
+
+@app.get("/avatar")
+async def get_favicon():
+    """Serve the favicon"""
+    return FileResponse("static/img/favico.png")
 @app.post("/auth/login")
 async def login(login_request: LoginRequest):
     """Authenticate user and return JWT token"""
@@ -395,30 +411,74 @@ async def get_interface():
     return FileResponse("static/index.html")
 
 @app.get("/conversations")
-async def get_user_conversations(current_user: dict = Depends(get_current_user)):
+async def get_user_conversations():
     """Get all conversations for the current user"""
-    conversations = get_conversations(current_user["username"])
+    # Temporairement sans authentification
+    conversations = get_conversations("admin")
     return {"conversations": conversations}
 
-@app.post("/conversations")
-async def create_conversation(
-    conversation: ConversationCreate,
-    current_user: dict = Depends(get_current_user)
-):
+@app.post("/conversations") 
+async def create_conversation(conversation: ConversationCreate):
     """Create a new conversation"""
     conversation_id = str(uuid.uuid4())
-    save_conversation(conversation_id, conversation.title, [], current_user["username"])
+    save_conversation(conversation_id, conversation.title, [], "admin")
     return {"id": conversation_id, "title": conversation.title}
-
+@app.get("/conversations/{conversation_id}/debug")
+async def debug_conversation(conversation_id: str):
+    """Debug conversation format issues"""
+    raw_conversation = get_conversation(conversation_id, "admin")
+    if not raw_conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Analyse des messages
+    message_analysis = []
+    for idx, msg in enumerate(raw_conversation["messages"]):
+        analysis = {
+            "index": idx,
+            "role": msg["role"],
+            "content_type": type(msg["content"]).__name__,
+            "content_length": len(str(msg["content"])),
+            "is_json_string": False,
+            "contains_error": False
+        }
+        
+        if isinstance(msg["content"], str):
+            analysis["is_json_string"] = msg["content"].startswith("[{") and msg["content"].endswith("}]")
+            analysis["contains_error"] = "Error" in msg["content"] or "error" in msg["content"]
+        
+        message_analysis.append(analysis)
+    
+    return {
+        "message_count": len(raw_conversation["messages"]),
+        "message_analysis": message_analysis,
+        "has_screenshots": len(raw_conversation.get("screenshots", [])) > 0
+    }
 @app.get("/conversations/{conversation_id}")
-async def get_conversation_detail(
-    conversation_id: str,
-    current_user: dict = Depends(get_current_user)
-):
+async def get_conversation_detail(conversation_id: str):
     """Get conversation details"""
-    conversation = get_conversation(conversation_id, current_user["username"])
+    conversation = get_conversation(conversation_id, "admin")
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Traitement des messages pour le frontend
+    processed_messages = []
+    for msg in conversation["messages"]:
+        # Vérifier si le contenu est une chaîne qui ressemble à un tableau
+        if isinstance(msg["content"], str) and msg["content"].startswith("[{") and msg["content"].endswith("}]"):
+            try:
+                # Tenter de convertir en JSON propre
+                import ast
+                content_list = ast.literal_eval(msg["content"])
+                # Convertir en texte simple
+                if isinstance(content_list, list) and all(isinstance(item, dict) for item in content_list):
+                    plain_text = " ".join([item.get('text', '') for item in content_list if 'text' in item])
+                    msg["content"] = plain_text
+            except:
+                # En cas d'échec, garder tel quel
+                pass
+        processed_messages.append(msg)
+    
+    conversation["messages"] = processed_messages
     
     screenshots = get_conversation_screenshots(conversation_id)
     conversation["screenshots"] = screenshots
@@ -457,9 +517,8 @@ async def export_conversation(
         raise HTTPException(status_code=400, detail="Unsupported format")
 
 @app.get("/api/limits")
-async def get_api_limits(current_user: dict = Depends(get_current_user)):
+async def get_api_limits():
     """Get API usage limits and remaining calls"""
-    # This would integrate with your actual API limit tracking
     return {
         "total_calls": 1000,
         "used_calls": 150,
@@ -499,12 +558,25 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             "type": "error",
             "message": f"An error occurred: {str(e)}"
         })
-
+async def get_current_user_websocket(session_id: str) -> Dict[str, Any]:
+    """Get current user for WebSocket connections"""
+    # Pour l'instant, retourner un utilisateur par défaut
+    # En production, vous devriez implémenter une vraie gestion de session
+    return {
+        "uid": "admin",
+        "username": "admin", 
+        "email": "admin@example.com",
+        "role": "admin",
+        "permissions": ["navigate", "screenshot", "click", "scroll", "type", "write_file", "download_tiktok"]
+    }
 async def handle_chat_message(session_id: str, message_data: dict, chat_session: ChatSession):
     """Handle a chat message with progress tracking"""
     try:
         message = message_data["message"]
         conversation_id = message_data.get("conversation_id")
+        
+        # Get current user for this session
+        current_user = await get_current_user_websocket(session_id)
         
         # Set task as running
         manager.set_task_status(session_id, True)
@@ -518,7 +590,7 @@ async def handle_chat_message(session_id: str, message_data: dict, chat_session:
         })
         
         # Check if this looks like a task requiring tools
-        if any(keyword in message.lower() for keyword in ["search", "navigate", "browse", "screenshot", "click", "research", "analyze", "find", "download"]):
+        if any(keyword in message.lower() for keyword in ["search", "navigate", "browse", "screenshot", "click", "research", "analyze", "find", "download", "tiktok"]):
             await handle_task_execution(session_id, message_data, chat_session)
         else:
             # Regular chat mode
@@ -534,7 +606,7 @@ async def handle_chat_message(session_id: str, message_data: dict, chat_session:
             if chat_session.conversation.should_summarize():
                 await manager.send_message(session_id, {
                     "type": "progress_update",
-                    "step": "optimizing",
+                    "step": "optimizing", 
                     "message": "Optimizing conversation memory...",
                     "progress": 30
                 })
@@ -582,7 +654,7 @@ async def handle_chat_message(session_id: str, message_data: dict, chat_session:
                 conversation_id, 
                 "Chat Session", 
                 [{"role": msg["role"], "content": str(msg["content"])} for msg in chat_session.conversation.messages],
-                "admin"  # Use actual user from session
+                current_user["username"]
             )
         
         # Set task as completed
@@ -602,9 +674,8 @@ async def handle_chat_message(session_id: str, message_data: dict, chat_session:
             "type": "error",
             "message": f"Error processing message: {str(e)}"
         })
-
 async def handle_task_execution(session_id: str, message_data: dict, chat_session: ChatSession):
-    """Handle complex task execution with detailed progress tracking"""
+    """Handle complex task execution with simplified progress tracking"""
     try:
         task_description = message_data["message"]
         conversation_id = message_data.get("conversation_id")
@@ -634,30 +705,27 @@ async def handle_task_execution(session_id: str, message_data: dict, chat_sessio
             manager.set_task_status(session_id, False)
             return
         
+        # Ne pas envoyer le message initial du LLM - juste traiter en arrière-plan
         chat_session.conversation.add_message("assistant", llm_response)
         
-        await manager.send_message(session_id, {
-            "type": "assistant_message",
-            "message": llm_response,
-            "conversation_id": conversation_id
-        })
-        
-        # Task automation loop with progress tracking
+        # Task automation loop avec messages simplifiés
         stop_reason = "tool_use"
         step_count = 0
         max_steps = 20
+        screenshots_captured = []
+        final_result = ""
         
         while stop_reason == "tool_use" and step_count < max_steps and manager.is_task_running(session_id):
             step_count += 1
             progress = min(90, (step_count / max_steps) * 80 + 10)
             
+            # Message de progression simplifié
+            tool_name = parsed_tool_call.get('tool', 'unknown')
             await manager.send_message(session_id, {
                 "type": "progress_update",
                 "step": f"step_{step_count}",
-                "message": f"Step {step_count}: Executing {parsed_tool_call.get('tool')}",
+                "message": f"Step {step_count}/{max_steps}: {tool_name}",
                 "progress": progress,
-                "tool_name": parsed_tool_call.get("tool"),
-                "tool_args": parsed_tool_call.get("arguments", {}),
                 "conversation_id": conversation_id
             })
             
@@ -670,16 +738,21 @@ async def handle_task_execution(session_id: str, message_data: dict, chat_sessio
             
             tool_results = await process_tool_requests(tool_calls, chat_session, conversation_id)
             
+            # Vérifier si c'est un screenshot
+            if parsed_tool_call.get("tool") == "screenshot":
+                for content_item in tool_results.get("content", []):
+                    if isinstance(content_item, dict) and "image" in content_item:
+                        screenshot_info = {
+                            "id": str(uuid.uuid4()),
+                            "step": step_count,
+                            "data": content_item["image"]["data"],
+                            "format": content_item["image"]["format"]
+                        }
+                        screenshots_captured.append(screenshot_info)
+            
             chat_session.conversation.add_message("user", tool_results["content"])
             
             if chat_session.conversation.should_summarize():
-                await manager.send_message(session_id, {
-                    "type": "progress_update",
-                    "step": "optimizing",
-                    "message": "Optimizing conversation memory...",
-                    "progress": progress,
-                    "conversation_id": conversation_id
-                })
                 chat_session.conversation.summarize_conversation()
             
             chat_session.conversation.remove_media_except_last_turn()
@@ -691,33 +764,21 @@ async def handle_task_execution(session_id: str, message_data: dict, chat_sessio
             
             chat_session.conversation.add_message("assistant", llm_response)
             
-            await manager.send_message(session_id, {
-                "type": "assistant_message",
-                "message": llm_response,
-                "conversation_id": conversation_id
-            })
-            
-            if parsed_tool_call:
-                stop_reason = "tool_use"
-            else:
+            # Stocker la réponse finale
+            if not parsed_tool_call:
+                final_result = llm_response
                 stop_reason = "content_stopped"
-                await manager.send_message(session_id, {
-                    "type": "task_completed",
-                    "message": "Task completed successfully!",
-                    "steps": step_count,
-                    "conversation_id": conversation_id,
-                    "final": True
-                })
                 break
         
-        if step_count >= max_steps:
-            await manager.send_message(session_id, {
-                "type": "task_completed",
-                "message": "Task execution reached maximum steps limit. Please review the results.",
-                "steps": step_count,
-                "conversation_id": conversation_id,
-                "final": True
-            })
+        # Envoyer le résultat final avec screenshots
+        await manager.send_message(session_id, {
+            "type": "task_completed",
+            "message": final_result,
+            "steps": step_count,
+            "conversation_id": conversation_id,
+            "screenshots": screenshots_captured,
+            "final": True
+        })
         
         # Save conversation
         if conversation_id:
@@ -727,15 +788,6 @@ async def handle_task_execution(session_id: str, message_data: dict, chat_sessio
                 [{"role": msg["role"], "content": str(msg["content"])} for msg in chat_session.conversation.messages],
                 "admin"
             )
-            
-            # Send final screenshots
-            screenshots = get_conversation_screenshots(conversation_id)
-            if screenshots:
-                await manager.send_message(session_id, {
-                    "type": "screenshots_summary",
-                    "screenshots": screenshots,
-                    "conversation_id": conversation_id
-                })
         
         manager.set_task_status(session_id, False)
         
@@ -749,7 +801,7 @@ async def handle_task_execution(session_id: str, message_data: dict, chat_sessio
         })
 
 async def process_tool_requests(tool_calls, chat_session: ChatSession, conversation_id: str = None):
-    """Process all tool calls in a response"""
+    """Process all tool calls in a response - version simplifiée"""
     consolidated_result = {
         "role": "user",
         "content": []
@@ -762,19 +814,22 @@ async def process_tool_requests(tool_calls, chat_session: ChatSession, conversat
         
         result = await chat_session.gemini_server.execute_tool(tool_name, arguments, tool_id)
         
-        # Check for screenshots and save them
+        # Traitement spécial pour les fichiers créés
+        if tool_name == "write_file" and "toolResult" in result:
+            filename = arguments.get("filename", "")
+            if filename:
+                # Ajouter l'URI du fichier au résultat
+                file_uri = f"artifact://{conversation_id or 'current'}/{filename}"
+                result["toolResult"]["file_created"] = {
+                    "filename": filename,
+                    "uri": file_uri,
+                    "content": arguments.get("content", "")
+                }
+        
         if "toolResult" in result and "content" in result["toolResult"]:
-            for content_item in result["toolResult"]["content"]:
-                if isinstance(content_item, dict) and "image" in content_item:
-                    # Save screenshot info
-                    if conversation_id:
-                        filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                        save_screenshot(conversation_id, filename, f"/screenshots/{filename}")
-            
             consolidated_result["content"].extend(result["toolResult"]["content"])
     
     return consolidated_result
-
 async def execute_tool_with_feedback(session_id: str, tool_call: Dict[str, Any], chat_session: ChatSession, conversation_id: str = None):
     """Execute a tool and provide real-time feedback"""
     try:
