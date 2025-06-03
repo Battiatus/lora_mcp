@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { getAuthToken } from '../utils/firebase';
 
-// URL de base de l'API
+// URL de base de l'API - Assurez-vous que cela correspond à votre backend
+// Remarque : Enlevez le '/api' de l'URL de base car il sera ajouté dans le baseURL
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
 // Créer une instance axios avec configuration par défaut
@@ -10,15 +11,21 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 30000 // 30 secondes de timeout
+  timeout: 30000, // 30 secondes de timeout
+  withCredentials: false // Définir sur true si vous utilisez des cookies d'authentification
 });
 
 // Intercepteur pour ajouter le token d'authentification à chaque requête
 api.interceptors.request.use(
   async (config) => {
     try {
+      console.log(`Requête API: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
+      
       // Essayer d'obtenir le token
-      const token = await getAuthToken();
+      const token = await getAuthToken().catch(err => {
+        console.log('Pas de token disponible:', err.message);
+        return null;
+      });
       
       // Ajouter le token à l'en-tête Authorization si disponible
       if (token) {
@@ -40,30 +47,23 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     // Traiter les réponses réussies
+    console.log(`Réponse API réussie: ${response.status}`);
     return response;
   },
   (error) => {
     // Gérer les erreurs de réponse
     if (error.response) {
       // La requête a été faite et le serveur a répondu avec un code d'état différent de 2xx
+      console.error('Erreur API:', error.response.status, error.response.data);
       
       // Si le token est expiré ou invalide (401)
       if (error.response.status === 401) {
-        // Rediriger vers la page de connexion si nécessaire
-        // window.location.href = '/login';
         console.error('Session expirée ou non autorisée');
       }
       
-      // Si l'accès est interdit (403)
-      if (error.response.status === 403) {
-        console.error('Accès interdit - Permissions insuffisantes');
-      }
-      
-      // Si le serveur renvoie une erreur
-      console.error('Erreur API:', error.response.data);
     } else if (error.request) {
       // La requête a été faite mais aucune réponse n'a été reçue
-      console.error('Aucune réponse reçue du serveur');
+      console.error('Aucune réponse reçue du serveur:', error.request);
     } else {
       // Une erreur s'est produite lors de la configuration de la requête
       console.error('Erreur lors de la configuration de la requête:', error.message);
