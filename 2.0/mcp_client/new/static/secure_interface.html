@@ -1,0 +1,2320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure MCP Assistant</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="./img/favico.png" />
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --secondary-color: #34a853;
+            --error-color: #ea4335;
+            --warning-color: #fbbc04;
+            --surface: #ffffff;
+            --background: #f8f9fa;
+            --text-primary: #202124;
+            --text-secondary: #5f6368;
+            --border: #dadce0;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        /* Authentication Screen */
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .auth-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        .auth-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+        .auth-logo i {
+            font-size: 32px;
+            color: white;
+        }
+        .auth-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .auth-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+        .google-signin-btn {
+            width: 100%;
+            padding: 12px 24px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .google-signin-btn:hover {
+            box-shadow: var(--shadow);
+            border-color: var(--primary-color);
+        }
+        .google-icon {
+            width: 20px;
+            height: 20px;
+        }
+        .auth-divider {
+            margin: 24px 0;
+            position: relative;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        .auth-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--border);
+        }
+        .auth-divider span {
+            background: var(--surface);
+            padding: 0 16px;
+        }
+        .email-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .form-input {
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        .signin-btn {
+            padding: 12px 24px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .signin-btn:hover {
+            background: #1557b0;
+        }
+        .signin-btn:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
+        }
+        .error-message {
+            color: var(--error-color);
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .loading {
+            display: none;
+            margin-top: 16px;
+        }
+        .loading.show {
+            display: block;
+        }
+        /* Logs Panel */
+        .logs-panel {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 400px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .logs-panel.show {
+            display: block;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 5px;
+        }
+        .log-entry.error {
+            color: #ff5252;
+        }
+        .log-entry.success {
+            color: #4caf50;
+        }
+    </style>
+    <!-- Insérer les styles CSS de l'interface MCP (ils seront chargés après l'authentification) -->
+    <link rel="stylesheet" href="/static/styles.css" id="mcpStyles" disabled>
+</head>
+<body>
+    <!-- Authentication Screen -->
+    <div id="authContainer" class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h1 class="auth-title">Secure MCP Assistant</h1>
+            <p class="auth-subtitle">Secure access to web automation tools</p>
+            <!-- Google Sign-In -->
+            <button id="googleSignIn" class="google-signin-btn">
+                <svg class="google-icon" viewBox="0 0 24 24">
+                    <path fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                    <path fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                </svg>
+                Continue with Google
+            </button>
+            <div class="auth-divider">
+                <span>or</span>
+            </div>
+            <!-- Email/Password Form -->
+            <form id="emailForm" class="email-form">
+                <input type="email" id="email" class="form-input" placeholder="Email address" required>
+                <input type="password" id="password" class="form-input" placeholder="Password" required>
+                <button type="submit" id="emailSignIn" class="signin-btn">Sign In</button>
+            </form>
+            <div id="authError" class="error-message"></div>
+            <div id="authLoading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> Authenticating...
+            </div>
+        </div>
+    </div>
+
+    <!-- L'interface MCP sera chargée ici après l'authentification -->
+    <div id="mcpContainer" style="display: none;"></div>
+    
+    <!-- Debug Logs Panel -->
+    <div id="logsPanel" class="logs-panel">
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCz19dJpx8NksDyjnNA1FVHdSPysxnur-U",
+            authDomain: "io-mcp-llm.firebaseapp.com",
+            projectId: "io-mcp-llm",
+            storageBucket: "io-mcp-llm.firebasestorage.app",
+            messagingSenderId: "1044747044303",
+            appId: "1:1044747044303:web:39683b96e85419eb883eba",
+            measurementId: "G-ZL4F38FGW6"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        
+        // Debug logger
+        class Logger {
+            constructor() {
+                this.logsPanel = document.getElementById('logsPanel');
+                this.logsContainer = document.getElementById('logs');
+                
+                // Create toggle key listener (press 'L' to toggle logs)
+                document.addEventListener('keydown', (e) => {
+                    if (e.key.toLowerCase() === 'l' && e.ctrlKey) {
+                        this.togglePanel();
+                    }
+                });
+                
+                // Show logs panel by default for debugging
+                this.togglePanel();
+            }
+            
+            togglePanel() {
+                this.logsPanel.classList.toggle('show');
+            }
+            
+            log(message, type = 'info') {
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry ${type}`;
+                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                this.logsContainer.appendChild(logEntry);
+                this.logsPanel.scrollTop = this.logsPanel.scrollHeight;
+                console.log(`[${type}]`, message);
+            }
+            
+            info(message) {
+                this.log(message, 'info');
+            }
+            
+            success(message) {
+                this.log(message, 'success');
+            }
+            
+            error(message) {
+                this.log(message, 'error');
+            }
+        }
+        
+        // MCP CSS & HTML
+        const mcpCss = `
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --surface-2: #f1f5f9;
+            --border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius: 8px;
+            --radius-lg: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 16px;
+        }
+
+        .logo i {
+            font-size: 24px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--warning-color);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: var(--success-color);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .sidebar-content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .mode-selector {
+            margin-bottom: 32px;
+        }
+
+        .mode-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .mode-btn:hover {
+            background: var(--surface-2);
+            border-color: var(--primary-color);
+        }
+
+        .mode-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .quick-actions h3,
+        .examples-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 12px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .action-btn:hover {
+            background: var(--surface-2);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .action-btn i {
+            font-size: 18px;
+            color: var(--primary-color);
+        }
+
+        .examples-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .example-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .example-item:hover {
+            background: var(--surface-2);
+        }
+
+        .example-item i {
+            color: var(--primary-color);
+            width: 16px;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 32px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .chat-controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .control-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .control-btn:hover {
+            background: var(--surface-2);
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 32px;
+        }
+
+        /* Welcome Message */
+        .welcome-message {
+            text-align: center;
+            max-width: 600px;
+            margin: 80px auto;
+        }
+
+        .welcome-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+
+        .welcome-icon i {
+            font-size: 32px;
+            color: white;
+        }
+
+        .welcome-message h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .welcome-message p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        .welcome-features {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+        }
+
+        .feature {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature i {
+            font-size: 24px;
+            color: var(--primary-color);
+        }
+
+        .feature span {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* Messages */
+        .message {
+            margin-bottom: 24px;
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-avatar {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .assistant-avatar {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .system-avatar {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .message-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .message-content {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 16px 20px;
+            margin-left: 44px;
+            position: relative;
+        }
+
+        .message-content::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 12px;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 8px 8px 8px 0;
+            border-color: transparent var(--border) transparent transparent;
+        }
+
+        .message-content::after {
+            content: '';
+            position: absolute;
+            left: -7px;
+            top: 12px;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 8px 8px 8px 0;
+            border-color: transparent var(--surface) transparent transparent;
+        }
+
+        .user-message .message-content {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .user-message .message-content::after {
+            border-color: transparent var(--primary-color) transparent transparent;
+        }
+
+        .tool-message {
+            background: var(--surface-2);
+            border-left: 4px solid var(--primary-color);
+            padding: 16px;
+            border-radius: var(--radius);
+            margin: 16px 0;
+        }
+
+        .tool-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .tool-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+
+        .tool-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .tool-status {
+            margin-left: auto;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .tool-status.executing {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .tool-status.success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .tool-status.error {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .tool-result {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .task-progress {
+            background: var(--surface-2);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin: 16px 0;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .progress-title {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .progress-steps {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .current-step {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* Input Container */
+        .input-container {
+            padding: 24px 32px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+        }
+
+        .input-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--primary-color);
+        }
+
+        #messageInput {
+            flex: 1;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: inherit;
+            font-size: 16px;
+            line-height: 1.5;
+            background: transparent;
+            max-height: 120px;
+            min-height: 24px;
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .action-btn-small {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--surface-2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+        }
+
+        .action-btn-small:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .send-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+        }
+
+        .send-btn:hover {
+            background: var(--primary-hover);
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .input-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        .input-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .typing-indicator.show {
+            display: flex;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .modal-close:hover {
+            background: var(--surface-2);
+            color: var(--text-primary);
+        }
+
+        .modal-content {
+            padding: 24px;
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--radius);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 280px;
+            }
+            
+            .chat-header {
+                padding: 16px 20px;
+            }
+            
+            .chat-header h1 {
+                font-size: 20px;
+            }
+            
+            .messages-container,
+            .input-container {
+                padding: 16px 20px;
+            }
+            
+            .welcome-message {
+                margin: 40px auto;
+            }
+            
+            .welcome-features {
+                flex-direction: column;
+                gap: 16px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 200px;
+            }
+            
+            .sidebar-content {
+                display: none;
+            }
+            
+            .action-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--surface-2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Loading States */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        /* Ajout: User profile menu */
+        .user-profile {
+            position: relative;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .user-profile-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+        }
+        
+        .user-profile-info:hover {
+            background: var(--surface-2);
+        }
+        
+        .user-avatar-sidebar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .user-details {
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .user-email {
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .logout-button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            border: none;
+            background: var(--surface-2);
+            color: var(--error-color);
+            border-radius: var(--radius);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .logout-button:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }`;
+        
+        const mcpHtml = `
+        <div class="app-container">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <div class="logo">
+                        <i class="fas fa-robot"></i>
+                        <span>MCP Assistant</span>
+                    </div>
+                    <div class="status-indicator" id="connectionStatus">
+                        <div class="status-dot"></div>
+                        <span>Connecting...</span>
+                    </div>
+                </div>
+                
+                <div class="sidebar-content">
+                    <div class="mode-selector">
+                        <button class="mode-btn active" data-mode="chat">
+                            <i class="fas fa-comments"></i>
+                            <span>Chat Mode</span>
+                        </button>
+                        <button class="mode-btn" data-mode="task">
+                            <i class="fas fa-tasks"></i>
+                            <span>Task Mode</span>
+                        </button>
+                    </div>
+                    
+                    <div class="quick-actions">
+                        <h3>Quick Actions</h3>
+                        <div class="action-grid">
+                            <button class="action-btn" data-action="screenshot">
+                                <i class="fas fa-camera"></i>
+                                <span>Screenshot</span>
+                            </button>
+                            <button class="action-btn" data-action="navigate">
+                                <i class="fas fa-globe"></i>
+                                <span>Navigate</span>
+                            </button>
+                            <button class="action-btn" data-action="research">
+                                <i class="fas fa-search"></i>
+                                <span>Research</span>
+                            </button>
+                            <button class="action-btn" data-action="analyze">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Analyze</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="examples-section">
+                        <h3>Example Commands</h3>
+                        <div class="examples-list">
+                            <div class="example-item" data-example="Research the latest AI trends and create a comprehensive report">
+                                <i class="fas fa-brain"></i>
+                                <span>AI Trends Research</span>
+                            </div>
+                            <div class="example-item" data-example="Navigate to news websites and analyze current events">
+                                <i class="fas fa-newspaper"></i>
+                                <span>News Analysis</span>
+                            </div>
+                            <div class="example-item" data-example="Take screenshots and document the user interface">
+                                <i class="fas fa-desktop"></i>
+                                <span>UI Documentation</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User Profile Section (Ajouté) -->
+                    <div class="user-profile">
+                        <div class="user-profile-info">
+                            <div class="user-avatar-sidebar" id="userAvatarSidebar"></div>
+                            <div class="user-details">
+                                <div class="user-name" id="userDisplayName">User</div>
+                                <div class="user-email" id="userEmailDisplay">user@example.com</div>
+                            </div>
+                        </div>
+                        <button class="logout-button" id="logoutButton">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Sign Out</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="main-content">
+                <div class="chat-header">
+                    <h1 id="chatTitle">Intelligent Web Assistant</h1>
+                    <div class="chat-controls">
+                        <button class="control-btn" id="clearChat">
+                            <i class="fas fa-trash"></i>
+                            Clear Chat
+                        </button>
+                        <button class="control-btn" id="exportChat">
+                            <i class="fas fa-download"></i>
+                            Export
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="chat-container">
+                    <div class="messages-container" id="messagesContainer">
+                        <div class="welcome-message">
+                            <div class="welcome-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h2>Welcome to MCP Advanced Assistant</h2>
+                            <p>Your intelligent web automation and research companion. Choose a mode and start your conversation.</p>
+                            <div class="welcome-features">
+                                <div class="feature">
+                                    <i class="fas fa-globe"></i>
+                                    <span>Web Navigation</span>
+                                </div>
+                                <div class="feature">
+                                    <i class="fas fa-search"></i>
+                                    <span>Research & Analysis</span>
+                                </div>
+                                <div class="feature">
+                                    <i class="fas fa-cogs"></i>
+                                    <span>Task Automation</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="input-container">
+                        <div class="input-wrapper">
+                            <textarea 
+                                id="messageInput" 
+                                placeholder="Type your message or describe a task..."
+                                rows="1"
+                            ></textarea>
+                            <div class="input-actions">
+                                <button class="action-btn-small" id="attachBtn">
+                                    <i class="fas fa-paperclip"></i>
+                                </button>
+                                <button class="send-btn" id="sendBtn">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="input-footer">
+                            <span class="input-hint">Press Enter to send, Shift+Enter for new line</span>
+                            <div class="typing-indicator" id="typingIndicator">
+                                <div class="typing-dots">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                                <span>Assistant is thinking...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modals -->
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal" id="imageModal">
+                <div class="modal-header">
+                    <h3>Screenshot</h3>
+                    <button class="modal-close" id="closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <img id="modalImage" src="" alt="Screenshot">
+                </div>
+            </div>
+        </div>`;
+
+        // MCP Interface Script
+        const mcpJs = `
+        class MCPInterface {
+            constructor() {
+                this.sessionId = this.generateSessionId();
+                this.websocket = null;
+                this.currentMode = "chat";
+                this.isConnected = false;
+                this.messageHistory = [];
+                this.userInfo = {
+                    email: null,
+                    displayName: null,
+                    uid: null
+                };
+                this.apiClient = null;
+                this.secureMCPClient = null;
+
+                this.initializeElements();
+                this.setupEventListeners();
+                this.tryConnectWebSocket();
+            }
+
+            setUserInfo(user) {
+                this.userInfo = {
+                    email: user.email,
+                    displayName: user.displayName || user.email.split('@')[0],
+                    uid: user.uid
+                };
+                
+                // Mettre à jour l'interface utilisateur avec les informations utilisateur
+                const userDisplayName = document.getElementById('userDisplayName');
+                const userEmailDisplay = document.getElementById('userEmailDisplay');
+                const userAvatarSidebar = document.getElementById('userAvatarSidebar');
+                
+                if (userDisplayName) userDisplayName.textContent = this.userInfo.displayName;
+                if (userEmailDisplay) userEmailDisplay.textContent = this.userInfo.email;
+                if (userAvatarSidebar) userAvatarSidebar.textContent = this.userInfo.displayName.charAt(0).toUpperCase();
+                
+                console.log("User info set:", this.userInfo);
+            }
+            
+            setSecureMCPClient(client) {
+                this.secureMCPClient = client;
+            }
+
+            generateSessionId() {
+                return (
+                    "session_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now()
+                );
+            }
+
+            initializeElements() {
+                this.elements = {
+                    messageInput: document.getElementById("messageInput"),
+                    sendBtn: document.getElementById("sendBtn"),
+                    messagesContainer: document.getElementById("messagesContainer"),
+                    connectionStatus: document.getElementById("connectionStatus"),
+                    typingIndicator: document.getElementById("typingIndicator"),
+                    chatTitle: document.getElementById("chatTitle"),
+                    clearChat: document.getElementById("clearChat"),
+                    exportChat: document.getElementById("exportChat"),
+                    modalOverlay: document.getElementById("modalOverlay"),
+                    modalImage: document.getElementById("modalImage"),
+                    closeModal: document.getElementById("closeModal"),
+                    logoutButton: document.getElementById("logoutButton"),
+                };
+            }
+
+            setupEventListeners() {
+                // Send message
+                this.elements.sendBtn.addEventListener("click", () => this.sendMessage());
+
+                // Enter key handling
+                this.elements.messageInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                // Auto-resize textarea
+                this.elements.messageInput.addEventListener("input", () => {
+                    this.autoResizeTextarea();
+                });
+
+                // Mode selector
+                document.querySelectorAll(".mode-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => this.switchMode(btn.dataset.mode));
+                });
+
+                // Quick actions
+                document.querySelectorAll(".action-btn").forEach((btn) => {
+                    btn.addEventListener("click", () =>
+                        this.handleQuickAction(btn.dataset.action)
+                    );
+                });
+
+                // Example commands
+                document.querySelectorAll(".example-item").forEach((item) => {
+                    item.addEventListener("click", () => {
+                        this.elements.messageInput.value = item.dataset.example;
+                        this.autoResizeTextarea();
+                    });
+                });
+
+                // Chat controls
+                this.elements.clearChat.addEventListener("click", () => this.clearChat());
+                this.elements.exportChat.addEventListener("click", () => this.exportChat());
+
+                // Modal
+                this.elements.closeModal.addEventListener("click", () => this.closeModal());
+                this.elements.modalOverlay.addEventListener("click", (e) => {
+                    if (e.target === this.elements.modalOverlay) this.closeModal();
+                });
+                
+                // Logout button
+                if (this.elements.logoutButton) {
+                    this.elements.logoutButton.addEventListener("click", () => {
+                        if (this.secureMCPClient && typeof this.secureMCPClient.logout === 'function') {
+                            this.secureMCPClient.logout();
+                        } else {
+                            console.error("Logout function not available");
+                            // Fallback - try to use Firebase directly
+                            if (window.firebase && window.firebase.auth) {
+                                window.firebase.auth().signOut()
+                                    .then(() => {
+                                        console.log("Logged out via Firebase");
+                                        window.location.reload();
+                                    })
+                                    .catch(error => {
+                                        console.error("Error signing out:", error);
+                                    });
+                            } else {
+                                alert("Logout function not available. Please refresh the page.");
+                            }
+                        }
+                    });
+                }
+            }
+
+            tryConnectWebSocket() {
+                try {
+                    this.connectWebSocket();
+                } catch (error) {
+                    console.error("Failed to connect WebSocket:", error);
+                    this.updateConnectionStatus("Failed to connect", false);
+                    
+                    // Simuler une connexion réussie pour la démo après 2 secondes
+                    setTimeout(() => {
+                        this.isConnected = true;
+                        this.updateConnectionStatus("Mode Démo", true);
+                        this.simulateWelcomeMessage();
+                    }, 2000);
+                }
+            }
+
+            connectWebSocket() {
+                const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+                const wsUrl = \`\${protocol}//\${window.location.host}/ws/\${this.sessionId}\`;
+
+                try {
+                    this.websocket = new WebSocket(wsUrl);
+
+                    this.websocket.onopen = () => {
+                        this.isConnected = true;
+                        this.updateConnectionStatus("Connected", true);
+                    };
+
+                    this.websocket.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        this.handleWebSocketMessage(data);
+                    };
+
+                    this.websocket.onclose = () => {
+                        this.isConnected = false;
+                        this.updateConnectionStatus("Disconnected", false);
+                        this.hideTypingIndicator();
+
+                        // Attempt to reconnect after 3 seconds
+                        setTimeout(() => {
+                            if (!this.isConnected) {
+                                this.tryConnectWebSocket();
+                            }
+                        }, 3000);
+                    };
+
+                    this.websocket.onerror = (error) => {
+                        console.error("WebSocket error:", error);
+                        this.updateConnectionStatus("Connection Error", false);
+                        
+                        // Après 2 secondes, passer en mode démo
+                        setTimeout(() => {
+                            this.isConnected = true;
+                            this.updateConnectionStatus("Mode Démo", true);
+                            this.simulateWelcomeMessage();
+                        }, 2000);
+                    };
+                } catch (error) {
+                    throw error;
+                }
+            }
+
+            // Fonction pour simuler une réponse de bienvenue si le WebSocket échoue
+            simulateWelcomeMessage() {
+                this.addMessage("assistant", "Bienvenue ! Je suis votre assistant MCP. Le serveur WebSocket n'a pas pu se connecter, mais vous pouvez quand même explorer l'interface en mode démonstration.");
+            }
+
+            updateConnectionStatus(message, connected) {
+                const statusElement = this.elements.connectionStatus;
+                const dot = statusElement.querySelector(".status-dot");
+                const text = statusElement.querySelector("span");
+
+                text.textContent = message;
+                dot.className = \`status-dot \${connected ? "connected" : ""}\`;
+            }
+
+            handleWebSocketMessage(data) {
+                switch (data.type) {
+                    case "typing":
+                        this.showTypingIndicator(data.message);
+                        break;
+
+                    case "assistant_message":
+                        this.hideTypingIndicator();
+                        this.addMessage("assistant", data.message);
+                        break;
+
+                    case "assistant_tool_call":
+                        this.hideTypingIndicator();
+                        this.addMessage("assistant", data.message);
+                        // Don't add tool message here - wait for execution feedback
+                        break;
+
+                    case "tool_executing":
+                        this.addOrUpdateToolMessage(
+                            data.tool_name,
+                            {},
+                            "executing",
+                            data.message
+                        );
+                        break;
+
+                    case "tool_success":
+                        this.updateToolMessage(
+                            data.tool_name,
+                            "success",
+                            data.message,
+                            data.result
+                        );
+                        break;
+
+                    case "tool_success_image":
+                        this.updateToolMessage(data.tool_name, "success", data.message);
+                        this.handleImageResult(data.content);
+                        break;
+
+                    case "tool_error":
+                        this.updateToolMessage(data.tool_name, "error", data.message);
+                        break;
+
+                    case "task_started":
+                        this.hideTypingIndicator();
+                        this.addTaskProgress(data.message);
+                        break;
+
+                    case "task_step":
+                        this.updateTaskProgress(data.step, data.message);
+                        this.addOrUpdateToolMessage(
+                            data.tool_name,
+                            data.tool_args,
+                            "executing",
+                            data.message
+                        );
+                        break;
+
+                    case "task_completed":
+                        this.completeTaskProgress(data.steps);
+                        if (data.message && data.message !== "Task completed successfully!") {
+                            this.addMessage("assistant", data.message);
+                        }
+                        break;
+
+                    case "system_message":
+                        this.addMessage("system", data.message);
+                        break;
+
+                    case "error":
+                        this.hideTypingIndicator();
+                        this.addMessage("system", \`❌ Error: \${data.message}\`, "error");
+                        break;
+                }
+            }
+
+            addOrUpdateToolMessage(toolName, args, status, message = "") {
+                // Check if tool message already exists
+                let toolElement = this.elements.messagesContainer.querySelector(
+                    \`[data-tool-name="\${toolName}"]\`
+                );
+
+                if (!toolElement) {
+                    // Create new tool message
+                    this.addToolMessage(toolName, args, status);
+                    toolElement = this.elements.messagesContainer.querySelector(
+                        \`[data-tool-name="\${toolName}"]\`
+                    );
+                }
+
+                if (toolElement) {
+                    this.updateToolStatus(toolName, status, message);
+                }
+            }
+
+            updateToolMessage(toolName, status, message, result = null) {
+                const toolElement = this.elements.messagesContainer.querySelector(
+                    \`[data-tool-name="\${toolName}"]\`
+                );
+                if (!toolElement) {
+                    // Create the tool message if it doesn't exist
+                    this.addToolMessage(toolName, {}, status);
+                    return this.updateToolStatus(toolName, status, message, result);
+                }
+
+                this.updateToolStatus(toolName, status, message, result);
+            }
+
+            sendMessage() {
+                const message = this.elements.messageInput.value.trim();
+                if (!message) return;
+
+                // Add user message to UI
+                this.addMessage("user", message);
+
+                // Clear input
+                this.elements.messageInput.value = "";
+                this.autoResizeTextarea();
+
+                // Si WebSocket connecté, envoyer le message
+                if (this.isConnected && this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                    // Send via WebSocket
+                    const messageData = {
+                        type: this.currentMode,
+                        [this.currentMode === "task" ? "task" : "message"]: message,
+                    };
+
+                    this.websocket.send(JSON.stringify(messageData));
+                } else {
+                    // Mode démo: simuler une réponse
+                    this.simulateResponse(message);
+                }
+
+                // Show typing indicator
+                this.showTypingIndicator("Assistant is thinking...");
+            }
+
+            // Fonction pour simuler une réponse en mode démo
+            simulateResponse(message) {
+                setTimeout(() => {
+                    this.hideTypingIndicator();
+                    if (this.currentMode === "chat") {
+                        this.addMessage("assistant", \`Vous avez dit: "\${message}". Ceci est une réponse simulée car le WebSocket n'est pas connecté. En mode normal, l'assistant répondrait à votre message.\`);
+                    } else {
+                        // Mode tâche
+                        this.addTaskProgress("Préparation de la tâche demandée...");
+                        
+                        setTimeout(() => {
+                            this.updateTaskProgress(1, "Analyse de la demande");
+                        }, 800);
+                        
+                        setTimeout(() => {
+                            this.updateTaskProgress(2, "Simulation des actions");
+                            this.addOrUpdateToolMessage("demo_tool", {}, "executing", "Exécution de l'outil de démonstration");
+                        }, 1600);
+                        
+                        setTimeout(() => {
+                            this.updateToolMessage("demo_tool", "success", "Outil exécuté avec succès");
+                        }, 2400);
+                        
+                        setTimeout(() => {
+                            this.completeTaskProgress(3);
+                            this.addMessage("assistant", \`J'ai simulé l'exécution de votre tâche: "\${message}". En mode connecté, les actions seraient réellement exécutées.\`);
+                        }, 3000);
+                    }
+                }, 1500);
+            }
+
+            addMessage(sender, content, type = "normal") {
+                const messageDiv = document.createElement("div");
+                messageDiv.className = \`message \${sender}-message\`;
+
+                const time = new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                });
+
+                const avatarIcon =
+                    {
+                        user: "fas fa-user",
+                        assistant: "fas fa-robot",
+                        system: "fas fa-cog",
+                    }[sender] || "fas fa-circle";
+
+                const senderName =
+                    {
+                        user: this.userInfo.displayName || "You",
+                        assistant: "Assistant",
+                        system: "System",
+                    }[sender] || sender;
+
+                messageDiv.innerHTML = \`
+                    <div class="message-header">
+                        <div class="message-avatar \${sender}-avatar">
+                            <i class="\${avatarIcon}"></i>
+                        </div>
+                        <div class="message-info">
+                            <div class="message-sender">\${senderName}</div>
+                            <div class="message-time">\${time}</div>
+                        </div>
+                    </div>
+                    <div class="message-content">
+                        \${this.formatMessageContent(content)}
+                    </div>
+                \`;
+
+                // Remove welcome message if it exists
+                const welcomeMessage =
+                    this.elements.messagesContainer.querySelector(".welcome-message");
+                if (welcomeMessage) {
+                    welcomeMessage.remove();
+                }
+
+                this.elements.messagesContainer.appendChild(messageDiv);
+                this.scrollToBottom();
+
+                // Store in history
+                this.messageHistory.push({
+                    sender,
+                    content,
+                    timestamp: new Date().toISOString(),
+                    type,
+                });
+            }
+
+            formatMessageContent(content) {
+                // Convert markdown-like formatting
+                content = content
+                    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+                    .replace(/\`(.*?)\`/g, "<code>$1</code>")
+                    .replace(/\n/g, "<br>");
+
+                // Convert URLs to links
+                const urlRegex = /(https?:\/\/[^\\s]+)/g;
+                content = content.replace(
+                    urlRegex,
+                    '<a href="$1" target="_blank" rel="noopener">$1</a>'
+                );
+
+                return content;
+            }
+
+            addToolMessage(toolName, args, status) {
+                const toolDiv = document.createElement("div");
+                toolDiv.className = "tool-message";
+                toolDiv.dataset.toolName = toolName;
+
+                const statusText =
+                    {
+                        preparing: "Preparing",
+                        executing: "Executing",
+                        success: "Completed",
+                        error: "Failed",
+                    }[status] || status;
+
+                const argsText =
+                    Object.keys(args).length > 0
+                        ? Object.entries(args)
+                            .map(([key, value]) => \`\${key}: \${value}\`)
+                            .join(", ")
+                        : "No parameters";
+
+                toolDiv.innerHTML = \`
+                    <div class="tool-header">
+                        <div class="tool-icon">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <div class="tool-name">\${toolName}</div>
+                        <div class="tool-status \${status}">\${statusText}</div>
+                    </div>
+                    <div class="tool-result">
+                        <strong>Parameters:</strong> \${argsText}
+                        <div class="tool-output"></div>
+                    </div>
+                \`;
+
+                this.elements.messagesContainer.appendChild(toolDiv);
+                this.scrollToBottom();
+            }
+
+            updateToolStatus(toolName, status, message, result = null) {
+                const toolElement = this.elements.messagesContainer.querySelector(
+                    \`[data-tool-name="\${toolName}"]\`
+                );
+                if (!toolElement) return;
+
+                const statusElement = toolElement.querySelector(".tool-status");
+                const outputElement = toolElement.querySelector(".tool-output");
+
+                const statusText =
+                    {
+                        executing: "Executing",
+                        success: "Completed",
+                        error: "Failed",
+                    }[status] || status;
+
+                statusElement.className = \`tool-status \${status}\`;
+                statusElement.textContent = statusText;
+
+                if (result) {
+                    outputElement.innerHTML = \`<br><strong>Result:</strong> \${result}\`;
+                } else if (message) {
+                    outputElement.innerHTML = \`<br><strong>Status:</strong> \${message}\`;
+                }
+
+                this.scrollToBottom();
+            }
+
+            addTaskProgress(message) {
+                const progressDiv = document.createElement("div");
+                progressDiv.className = "task-progress";
+                progressDiv.id = "currentTaskProgress";
+
+                progressDiv.innerHTML = \`
+                    <div class="progress-header">
+                        <div class="progress-title">Task Execution</div>
+                        <div class="progress-steps">Step <span class="current-step-num">0</span> of <span class="total-steps">?</span></div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="current-step">\${message}</div>
+                \`;
+
+                this.elements.messagesContainer.appendChild(progressDiv);
+                this.scrollToBottom();
+            }
+
+            updateTaskProgress(step, message) {
+                const progressElement = document.getElementById("currentTaskProgress");
+                if (!progressElement) return;
+
+                const currentStepNum = progressElement.querySelector(".current-step-num");
+                const currentStepText = progressElement.querySelector(".current-step");
+                const progressFill = progressElement.querySelector(".progress-fill");
+
+                currentStepNum.textContent = step;
+                currentStepText.textContent = message;
+
+                // Estimate progress (assuming max 20 steps)
+                const progress = Math.min((step / 20) * 100, 95);
+                progressFill.style.width = \`\${progress}%\`;
+
+                this.scrollToBottom();
+            }
+
+            completeTaskProgress(totalSteps) {
+                const progressElement = document.getElementById("currentTaskProgress");
+                if (!progressElement) return;
+
+                const totalStepsElement = progressElement.querySelector(".total-steps");
+                const progressFill = progressElement.querySelector(".progress-fill");
+                const currentStepText = progressElement.querySelector(".current-step");
+
+                totalStepsElement.textContent = totalSteps;
+                progressFill.style.width = "100%";
+                currentStepText.textContent = \`Task completed in \${totalSteps} steps\`;
+
+                this.scrollToBottom();
+            }
+
+            handleImageResult(content) {
+                // Find image data in content
+                for (const item of content) {
+                    if (item.image) {
+                        const imageDiv = document.createElement("div");
+                        imageDiv.className = "message-image";
+                        imageDiv.innerHTML = \`
+                            <img src="data:image/\${item.image.format};base64,\${item.image.data}" 
+                                alt="Screenshot" 
+                                style="max-width: 300px; border-radius: 8px; cursor: pointer;"
+                                onclick="mcpInterface.showImageModal(this.src)">
+                        \`;
+
+                        this.elements.messagesContainer.appendChild(imageDiv);
+                        this.scrollToBottom();
+                        break;
+                    }
+                }
+            }
+
+            showImageModal(src) {
+                this.elements.modalImage.src = src;
+                this.elements.modalOverlay.classList.add("show");
+            }
+
+            closeModal() {
+                this.elements.modalOverlay.classList.remove("show");
+            }
+
+            showTypingIndicator(message = "Assistant is thinking...") {
+                this.elements.typingIndicator.querySelector("span:last-child").textContent =
+                    message;
+                this.elements.typingIndicator.classList.add("show");
+            }
+
+            hideTypingIndicator() {
+                this.elements.typingIndicator.classList.remove("show");
+            }
+
+            switchMode(mode) {
+                this.currentMode = mode;
+
+                // Update UI
+                document.querySelectorAll(".mode-btn").forEach((btn) => {
+                    btn.classList.toggle("active", btn.dataset.mode === mode);
+                });
+
+                // Update title and placeholder
+                if (mode === "task") {
+                    this.elements.chatTitle.textContent = "Task Automation Assistant";
+                    this.elements.messageInput.placeholder =
+                        "Describe a complex task to automate...";
+                } else {
+                    this.elements.chatTitle.textContent = "Intelligent Web Assistant";
+                    this.elements.messageInput.placeholder =
+                        "Type your message or ask a question...";
+                }
+            }
+
+            handleQuickAction(action) {
+                const actions = {
+                    screenshot: "Take a screenshot of the current page",
+                    navigate: "Navigate to https://example.com",
+                    research: "Research the latest trends in artificial intelligence",
+                    analyze: "Analyze the current page content and provide insights",
+                };
+
+                if (actions[action]) {
+                    this.elements.messageInput.value = actions[action];
+                    this.autoResizeTextarea();
+                }
+            }
+
+            autoResizeTextarea() {
+                const textarea = this.elements.messageInput;
+                textarea.style.height = "auto";
+                textarea.style.height = Math.min(textarea.scrollHeight, 120) + "px";
+            }
+
+            clearChat() {
+                this.elements.messagesContainer.innerHTML = \`
+                    <div class="welcome-message">
+                        <div class="welcome-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <h2>Welcome to MCP Advanced Assistant</h2>
+                        <p>Your intelligent web automation and research companion. Choose a mode and start your conversation.</p>
+                        <div class="welcome-features">
+                            <div class="feature">
+                                <i class="fas fa-globe"></i>
+                                <span>Web Navigation</span>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-search"></i>
+                                <span>Research & Analysis</span>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-cogs"></i>
+                                <span>Task Automation</span>
+                            </div>
+                        </div>
+                    </div>
+                \`;
+                this.messageHistory = [];
+            }
+
+            exportChat() {
+                const chatData = {
+                    sessionId: this.sessionId,
+                    timestamp: new Date().toISOString(),
+                    messages: this.messageHistory,
+                };
+
+                const blob = new Blob([JSON.stringify(chatData, null, 2)], {
+                    type: "application/json",
+                });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = \`mcp-chat-\${new Date().toISOString().split("T")[0]}.json\`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                URL.revokeObjectURL(url);
+            }
+
+            scrollToBottom() {
+                setTimeout(() => {
+                    this.elements.messagesContainer.scrollTop =
+                        this.elements.messagesContainer.scrollHeight;
+                }, 100);
+            }
+        }`;
+        
+        class SecureMCPClient {
+            constructor() {
+                this.currentUser = null;
+                this.sessionId = null;
+                this.logger = new Logger();
+                this.mcpInterface = null;
+                
+                this.logger.info('Initializing Secure MCP Client...');
+                this.initializeEventListeners();
+                this.checkAuthState();
+            }
+            
+            initializeEventListeners() {
+                // Google Sign-In
+                document.getElementById('googleSignIn').addEventListener('click', () => {
+                    this.signInWithGoogle();
+                });
+                
+                // Email Sign-In
+                document.getElementById('emailForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.signInWithEmail();
+                });
+                
+                this.logger.info('Event listeners initialized');
+            }
+            
+            checkAuthState() {
+                this.logger.info('Checking authentication state...');
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        this.logger.success(`User authenticated: ${user.email}`);
+                        await this.handleAuthenticatedUser(user);
+                    } else {
+                        this.logger.info('No authenticated user found');
+                        this.showAuthScreen();
+                    }
+                });
+            }
+            
+            async signInWithGoogle() {
+                try {
+                    this.logger.info('Initiating Google Sign-In...');
+                    this.showLoading(true);
+                    
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    provider.addScope('email');
+                    provider.addScope('profile');
+                    
+                    const result = await auth.signInWithPopup(provider);
+                    this.logger.success(`Google Sign-In successful: ${result.user.email}`);
+                    
+                    await this.handleAuthenticatedUser(result.user);
+                } catch (error) {
+                    this.logger.error(`Google Sign-In failed: ${error.message}`);
+                    this.showError(error.message);
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+            
+            async signInWithEmail() {
+                try {
+                    const email = document.getElementById('email').value;
+                    this.logger.info(`Initiating Email Sign-In for: ${email}`);
+                    this.showLoading(true);
+                    
+                    const password = document.getElementById('password').value;
+                    const result = await auth.signInWithEmailAndPassword(email, password);
+                    
+                    this.logger.success(`Email Sign-In successful: ${result.user.email}`);
+                    await this.handleAuthenticatedUser(result.user);
+                } catch (error) {
+                    this.logger.error(`Email Sign-In failed: ${error.message}`);
+                    this.showError(error.message);
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+            
+            async handleAuthenticatedUser(user) {
+                try {
+                    this.currentUser = user;
+                    this.logger.info(`Processing authenticated user: ${user.email}`);
+                    
+                    // Get Firebase ID token
+                    this.logger.info('Getting Firebase ID token...');
+                    const idToken = await user.getIdToken();
+                    this.logger.success('Firebase ID token obtained');
+                    
+                    // Essayer de s'authentifier avec le backend
+                    try {
+                        const response = await fetch('/auth/firebase', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                firebase_token: idToken
+                            }),
+                            signal: AbortSignal.timeout(3000)
+                        });
+                        
+                        if (response.ok) {
+                            const authData = await response.json();
+                            this.sessionId = authData.session_id;
+                            this.logger.success(`Backend authentication successful. Session ID: ${this.sessionId}`);
+                        } else {
+                            throw new Error(`Backend responded with status: ${response.status}`);
+                        }
+                    } catch (error) {
+                        this.logger.error(`Backend authentication failed: ${error.message}`);
+                        this.logger.info('Continuing without backend authentication...');
+                    }
+                    
+                    // Charger l'interface MCP
+                    this.loadMCPInterface(user);
+                    
+                } catch (error) {
+                    this.logger.error(`Authentication processing failed: ${error.message}`);
+                    this.showError('Authentication failed. Please try again.');
+                    await this.logout();
+                }
+            }
+            
+            loadMCPInterface(user) {
+                try {
+                    this.logger.info('Loading MCP Interface...');
+                    
+                    // Injecter le CSS de MCP
+                    const styleElement = document.createElement('style');
+                    styleElement.id = 'mcpStyleSheet';
+                    styleElement.textContent = mcpCss;
+                    document.head.appendChild(styleElement);
+                    
+                    // Injecter le HTML de MCP
+                    const mcpContainer = document.getElementById('mcpContainer');
+                    mcpContainer.innerHTML = mcpHtml;
+                    
+                    // Masquer l'écran d'auth et afficher l'interface MCP
+                    document.getElementById('authContainer').style.display = 'none';
+                    mcpContainer.style.display = 'block';
+                    
+                    // Injecter et initialiser le script MCP
+                    const scriptElement = document.createElement('script');
+                    scriptElement.textContent = mcpJs + `
+                    // Initialize the interface when the page loads
+                    window.mcpInterface = new MCPInterface();
+                    window.mcpInterface.setUserInfo({
+                        email: "${user.email}",
+                        displayName: "${user.displayName || user.email.split('@')[0]}",
+                        uid: "${user.uid}"
+                    });
+                    window.mcpInterface.setSecureMCPClient(window.secureMCPClient);`;
+                    document.body.appendChild(scriptElement);
+                    
+                    // Stocker la référence à l'interface MCP
+                    this.mcpInterface = window.mcpInterface;
+                    
+                    this.logger.success('MCP Interface loaded successfully');
+                } catch (error) {
+                    this.logger.error(`Failed to load MCP Interface: ${error.message}`);
+                    this.showError('Failed to load the application interface. Please try again.');
+                }
+            }
+            
+            async logout() {
+                try {
+                    this.logger.info('Logging out...');
+                    await auth.signOut();
+                    this.currentUser = null;
+                    this.sessionId = null;
+                    
+                    // Nettoyer l'interface MCP
+                    const mcpContainer = document.getElementById('mcpContainer');
+                    mcpContainer.innerHTML = '';
+                    mcpContainer.style.display = 'none';
+                    
+                    // Supprimer le style MCP
+                    const mcpStyle = document.getElementById('mcpStyleSheet');
+                    if (mcpStyle) mcpStyle.remove();
+                    
+                    this.showAuthScreen();
+                    this.logger.success('Logout successful');
+                } catch (error) {
+                    this.logger.error(`Logout error: ${error.message}`);
+                }
+            }
+            
+            showAuthScreen() {
+                document.getElementById('authContainer').style.display = 'flex';
+                document.getElementById('mcpContainer').style.display = 'none';
+                this.clearError();
+                this.logger.info('Showing authentication screen');
+            }
+            
+            showLoading(show) {
+                const loading = document.getElementById('authLoading');
+                const signInBtn = document.getElementById('emailSignIn');
+                const googleBtn = document.getElementById('googleSignIn');
+                
+                if (show) {
+                    loading.classList.add('show');
+                    signInBtn.disabled = true;
+                    googleBtn.disabled = true;
+                    this.logger.info('Loading indicator shown');
+                } else {
+                    loading.classList.remove('show');
+                    signInBtn.disabled = false;
+                    googleBtn.disabled = false;
+                    this.logger.info('Loading indicator hidden');
+                }
+            }
+            
+            showError(message) {
+                const errorDiv = document.getElementById('authError');
+                errorDiv.textContent = message;
+                this.logger.error(`Error displayed: ${message}`);
+            }
+            
+            clearError() {
+                const errorDiv = document.getElementById('authError');
+                errorDiv.textContent = '';
+                this.logger.info('Error message cleared');
+            }
+        }
+        
+        // Initialize the client
+        document.addEventListener('DOMContentLoaded', () => {
+            window.secureMCPClient = new SecureMCPClient();
+        });
+    </script>
+</body>
+</html>

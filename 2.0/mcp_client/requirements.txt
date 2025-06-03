@@ -4,6 +4,7 @@ pydantic
 httpx
 google-cloud-logging
 google-cloud-aiplatform
+python-dotenv
 pdfkit
 markdown
 python-multipart

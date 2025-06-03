@@ -20,3 +20,4 @@ grpcio
 google-cloud-core
 google-cloud-firestore
 firebase-admin
+python-dotenv
