@@ -32,15 +32,23 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 
 // Configuration CORS
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || '*',
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-app.use(cors(corsOptions));
+// const corsOptions = {
+//   origin: process.env.FRONTEND_URL || '*',
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   preflightContinue: false,
+//   optionsSuccessStatus: 204,
+//   credentials: true,
+//   allowedHeaders: ['Content-Type', 'Authorization']
+// };
+
+app.use(cors({
+  origin: [process.env.FRONTEND_URL, 'http://127.0.0.1:3000'],  // Origines autorisées (frontend)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],        // Méthodes autorisées
+  allowedHeaders: ['Content-Type', 'Authorization'],           // En-têtes autorisés
+  credentials: true                                            // Autoriser les cookies (si nécessaire)
+}));
+
+// app.use(cors(corsOptions));
 
 // Limiteur de débit global pour prévenir les attaques par force brute
 const apiLimiter = rateLimit({
