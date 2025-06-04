@@ -36,7 +36,7 @@ const authController = require('../controllers/authController');
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/me', authenticate, authController.getCurrentUser);
+router.get('/me', authController.getCurrentUser);
 
 /**
  * @swagger
@@ -79,7 +79,7 @@ router.get('/me', authenticate, authController.getCurrentUser);
  *       403:
  *         description: Non autorisé à créer des utilisateurs avec des rôles privilégiés
  */
-router.post('/users', authenticate, authController.createUser);
+router.post('/users',  authController.createUser);
 
 /**
  * @swagger
@@ -115,7 +115,7 @@ router.post('/users', authenticate, authController.createUser);
  *       403:
  *         description: Non autorisé à modifier d'autres utilisateurs
  */
-router.put('/users/:uid', authenticate, authController.updateUser);
+router.put('/users/:uid',  authController.updateUser);
 
 /**
  * @swagger
@@ -139,6 +139,6 @@ router.put('/users/:uid', authenticate, authController.updateUser);
  *       403:
  *         description: Non autorisé à supprimer d'autres utilisateurs
  */
-router.delete('/users/:uid', authenticate, authController.deleteUser);
+router.delete('/users/:uid',  authController.deleteUser);
 
 module.exports = router;
