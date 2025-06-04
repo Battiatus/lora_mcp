@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
 import Header from './components/Layout/Header';
-import Sidebar from './components/Layout/Sidebar';
+// import Sidebar from './components/Layout/Sidebar';
 import ChatWindow from './components/Chat/ChatWindow';
 import Login from './components/Auth/Login';
 import Modal from './components/UI/Modal';
@@ -60,10 +60,10 @@ export default function App() {
         <div className="app-container">
           {isLoggedIn ? (
             <>
-              <Sidebar 
+              {/* <Sidebar 
                 currentMode={currentMode} 
                 onSwitchMode={switchMode} 
-              />
+              /> */}
               <div className="main-content">
                 <Header 
                   title={currentMode === 'chat' ? 'Intelligent Web Assistant' : 'Task Automation Assistant'} 
