@@ -7,6 +7,7 @@ import Dashboard from './pages/dashboard/Dashboard';
 import ToolsList from './pages/tools/ToolsList';
 import NotFound from './pages/NotFound';
 import UserManagement from './pages/admin/UserManagement';
+import ChatContainer from './components/chat/ChatInterface';
 
 /**
  * Configuration des routes de l'application
@@ -34,6 +35,10 @@ const getRoutes = (isAuthenticated, isAdmin) => [
   {
     path: '/tools',
     element: isAuthenticated ? <ToolsList /> : <Navigate to="/login" />
+  },
+  {
+    path: '/chat',
+    element: isAuthenticated ? <ChatContainer /> : <Navigate to="/login" />
   },
   {
     path: '/profile',

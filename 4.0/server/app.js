@@ -1,5 +1,5 @@
+// app.js - Configuration principale de l'application Express révisée
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
@@ -23,7 +23,13 @@ const toolRoutes = require('./routes/toolRoutes');
 const app = express();
 
 // Configuration des middleware de base
-app.use(helmet()); // Sécurité des en-têtes HTTP
+app.use(helmet({
+  // Désactiver certaines protections qui peuvent causer des problèmes
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
+})); 
 app.use(compression()); // Compression des réponses
 app.use(express.json({ limit: '10mb' })); // Parsing JSON avec limite
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -31,16 +37,20 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Configuration du logging
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 
-// Configuration CORS
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || '*',
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-app.use(cors(corsOptions));
+// Permettre toutes les origines CORS (en désactivant totalement la sécurité CORS)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Répondre immédiatement aux requêtes OPTIONS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Limiteur de débit global pour prévenir les attaques par force brute
 const apiLimiter = rateLimit({
@@ -71,6 +81,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
   customSiteTitle: "MCP Server API Documentation"
 }));
 
+// Ajout d'un ping endpoint pour vérifier si le serveur est actif
+app.get('/api/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
 // Routes API
 app.use('/api/auth', authRoutes);
 app.use('/api/tools', toolRoutes);
@@ -83,7 +98,12 @@ app.use('*', (req, res) => {
   });
 });
 
-// Middleware de gestion d'erreurs global
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'healthy', service: 'mcp-web-interface' });
+});
+
+
+// Middleware de gestion d'erreurs global amélioré
 app.use(errorHandler);
 
 module.exports = app;

@@ -22,15 +22,13 @@ const Footer = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-2 gap-8 md:gap-16">
+          {/* <div className="grid grid-cols-2 gap-8 md:gap-16">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-300">Ressources</h3>
               <ul className="mt-4 space-y-2">
+                
                 <li>
-                  <Link to="/documentation" className="text-sm text-gray-400 hover:text-white">Documentation</Link>
-                </li>
-                <li>
-                  <Link to="/api-docs" className="text-sm text-gray-400 hover:text-white">API</Link>
+                  <Link to="/docs" className="text-sm text-gray-400 hover:text-white">API</Link>
                 </li>
                 <li>
                   <Link to="/faq" className="text-sm text-gray-400 hover:text-white">FAQ</Link>
@@ -49,7 +47,7 @@ const Footer = () => {
                 </li>
               </ul>
             </div>
-          </div>
+          </div> */}
         </div>
         
         <hr className="my-6 border-gray-700" />

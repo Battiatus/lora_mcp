@@ -28,7 +28,7 @@ const toolLimiter = rateLimit({
  *       200:
  *         description: Liste des outils récupérée avec succès
  */
-router.get('/', authenticate, toolController.listTools);
+router.get('/', toolController.listTools);
 
 /**
  * @swagger
@@ -64,7 +64,7 @@ router.get('/', authenticate, toolController.listTools);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.post('/execute', authenticate, toolLimiter, toolController.executeTool);
+router.post('/execute',  toolLimiter, toolController.executeTool);
 
 /**
  * @swagger
@@ -86,6 +86,6 @@ router.post('/execute', authenticate, toolLimiter, toolController.executeTool);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.delete('/sessions/:sessionId', authenticate, toolController.cleanupSession);
+router.delete('/sessions/:sessionId',  toolController.cleanupSession);
 
 module.exports = router;
