@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useChatContext } from '../../context/ChatContext';
 import webSocketService from '../../services/webSocketService';
 
