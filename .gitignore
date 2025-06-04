@@ -20,5 +20,6 @@ __pycache__/
 4.0/server/node_modules
 4.0/client/node_modules
 
+*credentials.json
 **.log
 
