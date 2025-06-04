@@ -8,7 +8,7 @@ const winston = require('winston');
 const dotenv = require('dotenv');
 
 // Import the MCP client components
-const { Configuration, HTTPServer, LLMClient, ChatSession } = require('./enhanced_client');
+const { Configuration, HTTPServer, LLMClient, ChatSession } = require('./client');
 
 // Load environment variables
 dotenv.config();
@@ -482,7 +482,7 @@ app.get('/health', (req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 8082;
+const PORT = process.env.WEB_INTERFACE_PORT || 8082;
 server.listen(PORT, () => {
   logger.info(`MCP Web Interface running on port ${PORT}`);
 });
