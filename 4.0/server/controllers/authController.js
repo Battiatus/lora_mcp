@@ -91,26 +91,18 @@ const createUser = async (req, res) => {
  */
 const getCurrentUser = async (req, res) => {
   try {
-    const uid = req.user.uid;
-    
-    // Récupérer l'utilisateur depuis Firebase Auth
-    const userRecord = await auth.getUser(uid);
-    
-    // Récupérer les données supplémentaires depuis Firestore
-    const userDoc = await firestore.collection('users').doc(uid).get();
-    const userData = userDoc.exists ? userDoc.data() : {};
-    
+console.log('getCurrentUser called with user:', req);
     res.json({
       status: 'success',
-      data: {
-        uid: userRecord.uid,
-        email: userRecord.email,
-        emailVerified: userRecord.emailVerified,
-        displayName: userRecord.displayName,
-        photoURL: userRecord.photoURL,
-        role: userData.role || req.user.role || 'user',
-        lastLogin: userRecord.metadata.lastSignInTime
-      }
+      // data: {
+      //   uid: userRecord.uid,
+      //   email: userRecord.email,
+      //   emailVerified: userRecord.emailVerified,
+      //   displayName: userRecord.displayName,
+      //   photoURL: userRecord.photoURL,
+      //   role: userData.role || req.user.role || 'user',
+      //   lastLogin: userRecord.metadata.lastSignInTime
+      // }
     });
   } catch (error) {
     logger.error(`Erreur lors de la récupération du profil utilisateur: ${error.message}`);
