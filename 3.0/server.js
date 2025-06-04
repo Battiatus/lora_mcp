@@ -125,7 +125,7 @@ async function getOrCreateContext(sessionId) {
 
     // Initialize Playwright
     const browser = await chromium.launch({
-      headless: true,
+      headless: false,
       args: [
         '--disable-blink-features=AutomationControlled',
         '--no-sandbox',
