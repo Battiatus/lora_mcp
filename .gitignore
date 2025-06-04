@@ -12,6 +12,8 @@ __pycache__/
 
 
 */node_modules
+*package-lock.json
+*.npmrc
 */screenshots
 */downloads
 */artifacts
@@ -19,3 +21,4 @@ __pycache__/
 4.0/client/node_modules
 
 **.log
+
