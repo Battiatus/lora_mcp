@@ -12,8 +12,8 @@ const swaggerUi = require('swagger-ui-express');
 const http = require('http');
 const jwt = require('jsonwebtoken');
 
-// Import WebSocket setup
-const { setupWebSocketServer } = require('./websocketServer');
+// Import authentication middleware
+const { authenticateJWT } = require('./authMiddleware');
 
 // Configure logger
 const logger = winston.createLogger({
@@ -29,9 +29,6 @@ const logger = winston.createLogger({
     new winston.transports.File({ filename: 'server.log' })
   ]
 });
-
-// Import authentication middleware
-const { authenticateJWT } = require('./authMiddleware');
 
 // Create directories for resources
 ['screenshots', 'artifacts'].forEach(dir => {
@@ -59,16 +56,7 @@ app.use(cors(corsOptions));
 
 // Security enhancements
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'", process.env.FIREBASE_AUTH_DOMAIN]
-    }
-  }
+  contentSecurityPolicy: false  // Disable CSP for simplicity in development
 }));
 
 // Rate limiting
@@ -79,8 +67,9 @@ const limiter = rateLimit({
   legacyHeaders: false,
   message: 'Too many requests from this IP, please try again after 15 minutes'
 });
+app.use('/api/', limiter);
 
-// Swagger documentation setup
+// Setup Swagger
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -716,7 +705,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Handle process termination
+// Create HTTP server - no WebSocket
+const PORT = process.env.PORT || 8080;
+const server = http.createServer(app);
+
+// Start server
+server.listen(PORT, () => {
+  logger.info(`MCP Server HTTP API running on port ${PORT}`);
+});
+
+// Handle graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Shutting down server...');
   
@@ -728,10 +726,4 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-// Start server
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  logger.info(`MCP Server HTTP API is running on port ${PORT}`);
-});
-
-module.exports = app;
+module.exports = { app, server };
