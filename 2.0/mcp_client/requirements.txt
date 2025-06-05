@@ -10,3 +10,5 @@ markdown
 python-multipart
 python-jose[cryptography] 
 passlib[bcrypt]
+firebase_admin
+google-cloud-firestore
