@@ -4,10 +4,10 @@ __pycache__/
 */.venv
 *.env
 
-*downloads
-*videos
-*artefacts
-*screenshot
+*downloads*
+*videos*
+*artifacts*
+*screenshot*
 # Logs
 
 
