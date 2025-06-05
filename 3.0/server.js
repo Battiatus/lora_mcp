@@ -5,6 +5,10 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 const winston = require('winston');
+const dotenv = require('dotenv');
+
+// Load environment variables
+dotenv.config();
 
 // Configure logger
 const logger = winston.createLogger({
