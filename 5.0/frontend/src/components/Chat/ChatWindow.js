@@ -10,33 +10,33 @@ export default function ChatWindow({ mode, openModal }) {
   const [isConnected, setIsConnected] = useState(false);
   const { messages, addMessage, clearMessages } = useChatContext();
   const messagesEndRef = useRef(null);
-
-  useEffect(() => {
-    // Initialize MCP client
-    const initClient = async () => {
-      try {
-        const success = await mcpClientBridge.initialize();
-        if (success) {
-          setIsConnected(true);
-        }
-      } catch (error) {
-        console.error('Failed to initialize MCP client:', error);
+useEffect(() => {
+  // Initialize MCP client with auth token
+  const initClient = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const success = await mcpClientBridge.initialize(token);
+      if (success) {
+        setIsConnected(true);
       }
-    };
+    } catch (error) {
+      console.error('Failed to initialize MCP client:', error);
+    }
+  };
 
-    initClient();
+  initClient();
 
-    // Register message handlers
-    mcpClientBridge.addListener('message', handleWebSocketMessage);
-    mcpClientBridge.addListener('status', handleConnectionStatus);
-    
-    // Clean up on unmount
-    return () => {
-      mcpClientBridge.removeListener('message', handleWebSocketMessage);
-      mcpClientBridge.removeListener('status', handleConnectionStatus);
-      mcpClientBridge.cleanup();
-    };
-  }, []);
+  // Register message handlers
+  mcpClientBridge.addListener('message', handleWebSocketMessage);
+  mcpClientBridge.addListener('status', handleConnectionStatus);
+  
+  // Clean up on unmount
+  return () => {
+    mcpClientBridge.removeListener('message', handleWebSocketMessage);
+    mcpClientBridge.removeListener('status', handleConnectionStatus);
+    mcpClientBridge.cleanup();
+  };
+}, []);
 
   // Scroll to bottom when messages change
   useEffect(() => {
