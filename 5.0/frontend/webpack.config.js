@@ -1,19 +1,13 @@
 const path = require('path');
 const webpack = require('webpack');
-const dotenv = require('dotenv');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-
-// Load environment variables from .env file
-const env = dotenv.config().parsed || {};
+const env = require('./webpack.env');
 
 // Create environment variables to inject into the bundle
 const envKeys = Object.keys(env).reduce((prev, next) => {
   prev[`process.env.${next}`] = JSON.stringify(env[next]);
   return prev;
 }, {});
-
-// Add React environment variables by default
-envKeys['process.env.NODE_ENV'] = JSON.stringify(process.env.NODE_ENV || 'development');
 
 module.exports = {
   entry: './src/index.js',
