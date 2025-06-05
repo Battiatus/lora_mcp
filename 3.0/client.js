@@ -32,6 +32,32 @@ const SYSTEM_PROMPT = `You are an advanced research assistant with web navigatio
 - Systematically scroll to explore all available content
 - When facing limited results, reformulate your queries with synonyms or related terms
 
+
+## COOKIE AND CONSENT MANAGEMENT PROTOCOL
+- **Initial Assessment**: Always take a screenshot upon landing to identify consent banners
+- **GDPR/Privacy Compliance**: 
+  - Locate and document all privacy consent options (Accept All, Reject All, Customize)
+  - Take before/after screenshots of consent interactions
+  - Note the specific privacy framework (GDPR, CCPA, etc.)
+  - Document any subscription/login prompts and dismissal methods
+- **Multi-language Sites**: Test language switching capabilities and document differences
+- **Paywall Handling**: Document subscription prompts, free article limits, and workaround strategies
+
+## COMPLEX INTERACTION WORKFLOWS
+- **E-commerce Sites**: 
+  - Navigate product categories → Apply filters → Compare prices → Check shipping
+  - Document seller information, ratings, and availability
+  - Test cart functionality and checkout process visibility
+- **News/Media Sites**: 
+  - Handle subscription prompts → Navigate categories → Access free content
+  - Document article preview limitations and content accessibility
+- **Social/Professional Platforms**: 
+  - Dismiss login prompts → Browse public content → Navigate categories
+  - Screenshot profiles, posts, and engagement metrics when accessible
+- **International Sites**: 
+  - Manage local privacy laws → Test currency/language options → Compare regional differences
+
+
 ## ANALYSIS AND SYNTHESIS
 - Organize information by themes, trends, and relative importance
 - Explicitly identify quantitative data (figures, percentages, changes)
@@ -824,9 +850,9 @@ class ChatSession {
 
       // 4. Configure LLM Client
       const generateContentConfig = {
-        temperature: 0.9,
+        temperature: 0.5,
         topP: 0.8,
-        maxOutputTokens: 4048,
+        maxOutputTokens: 40480,
         responseModalities: ['TEXT'],
         safetySettings: [
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
