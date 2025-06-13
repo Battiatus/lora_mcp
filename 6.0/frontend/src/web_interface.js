@@ -100,7 +100,7 @@ const server = http.createServer(app);
 // Add middleware
 app.use(express.json());
 app.use(cors());
-app.use(express.static(path.join(__dirname, 'static')));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 async function getOrCreateChatSession(sessionId) {
   if (!(sessionId in chatSessions)) {
@@ -163,6 +163,7 @@ app.post('/api/sessions', async (req, res) => {
       type: 'system_message',
       message: 'Welcome to MCP Advanced Assistant! Session initialized.'
     });
+    console.log (`info ${getOrCreateChatSession}` )
     
     res.json({ 
       session_id: sessionId,
@@ -209,7 +210,7 @@ app.delete('/api/sessions/:sessionId', async (req, res) => {
 });
 
 // Route de polling pour obtenir les réponses en attente
-app.get('/api/sessions/:sessionId/responses', (req, res) => {
+app.get('/api/sessions/:sessionId', (req, res) => {
   const { sessionId } = req.params;
   
   if (!sessionInfo[sessionId]) {
@@ -582,34 +583,34 @@ async function executeToolWithFeedback(sessionId, toolCall, chatSession) {
 }
 
 // Nettoyage périodique des sessions inactives
-setInterval(async () => {
-  const now = Date.now();
-  const inactiveThreshold = 30 * 60 * 1000; // 30 minutes
+// setInterval(async () => {
+//   const now = Date.now();
+//   const inactiveThreshold = 30 * 60 * 1000; // 30 minutes
   
-  for (const sessionId in sessionInfo) {
-    const lastActivity = new Date(sessionInfo[sessionId].last_activity).getTime();
+//   for (const sessionId in sessionInfo) {
+//     const lastActivity = new Date(sessionInfo[sessionId].last_activity).getTime();
     
-    if (now - lastActivity > inactiveThreshold) {
-      logger.info(`Cleaning up inactive session: ${sessionId}`);
+//     if (now - lastActivity > inactiveThreshold) {
+//       logger.info(`Cleaning up inactive session: ${sessionId}`);
       
-      try {
-        if (chatSessions[sessionId]) {
-          await chatSessions[sessionId].cleanupServers();
-          delete chatSessions[sessionId];
-        }
+//       try {
+//         if (chatSessions[sessionId]) {
+//           await chatSessions[sessionId].cleanupServers();
+//           delete chatSessions[sessionId];
+//         }
         
-        delete sessionInfo[sessionId];
-        pendingResponses.clearResponses(sessionId);
-      } catch (error) {
-        logger.error(`Error cleaning up inactive session ${sessionId}: ${error.message}`);
-      }
-    }
-  }
-}, 15 * 60 * 1000); // Vérifier toutes les 15 minutes
+//         delete sessionInfo[sessionId];
+//         pendingResponses.clearResponses(sessionId);
+//       } catch (error) {
+//         logger.error(`Error cleaning up inactive session ${sessionId}: ${error.message}`);
+//       }
+//     }
+//   }
+// }, 15 * 60 * 1000); // Vérifier toutes les 15 minutes
 
 // Routes
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'static', 'index.html'));
+res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
 // Serve React app in production
@@ -620,6 +621,15 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
   });
 }
+
+// app.get('/manifest.json', (req, res) => {
+//   res.sendFile(path.join(__dirname, '..', 'public', 'manifest.json'));
+// });
+
+
+// app.get('/logo192.png', (req, res) => {
+//   res.sendFile(path.join(__dirname, '..', 'public', 'logo192.png'));
+// });
 
 // Start server
 const PORT = process.env.WEB_INTERFACE_PORT || 8082;
