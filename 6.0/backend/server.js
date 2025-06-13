@@ -68,12 +68,14 @@ const swaggerOptions = {
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 /**
  * @swagger
- * /health:
- *   get:
+ * /api/health:
+ *   get: 
+ *     tags:
+ *       - Status
  *     summary: Check server health
  *     description: Returns the health status of the server
  *     responses:
@@ -91,14 +93,16 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
  *                   type: string
  *                   example: mcp-server
  */
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', service: 'mcp-server' });
 });
 
 /**
  * @swagger
- * /tools:
- *   get:
+ * /api/tools:
+ *   get: 
+ *     tags:
+ *       - Tools
  *     summary: Get available tools
  *     description: Returns a list of tools available for browser automation
  *     responses:
@@ -123,7 +127,7 @@ app.get('/health', (req, res) => {
  *                       input_schema:
  *                         type: object
  */
-app.get('/tools', (req, res) => {
+app.get('/api/tools', (req, res) => {
   const tools = [
     {
       name: 'navigate',
@@ -314,11 +318,110 @@ app.get('/tools', (req, res) => {
 
   res.json({ tools });
 });
+/**
+ * @swagger
+ * /api/sessions/{session_id}/chat:
+ *   post:
+ *  tags:
+ *      - Sessions
+ *     summary: Send a chat message
+ *     description: Processes a chat message in the specified session
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the session
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 description: The message to process
+ *     responses:
+ *       200:
+ *         description: Message processed successfully
+ *       404:
+ *         description: Session not found
+ */
+app.post('/api/sessions/:session_id/chat', (req, res) => {
+  const { session_id } = req.params;
+  const { message } = req.body;
+  
+  if (!sessions[session_id]) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  // Update last activity timestamp
+  sessions[session_id].last_activity = new Date().toISOString();
+  
+  // For now, just acknowledge the message
+  res.json({ success: true, message: 'Message received, processing started' });
+  
+  // In a real implementation, you would process the message with client.js
+  // and store responses for retrieval via the /responses endpoint
+});
 
 /**
  * @swagger
- * /sessions:
+ * /api/sessions/{session_id}/task:
  *   post:
+ *    tags:
+ *      - Sessions
+ *     summary: Execute a task
+ *     description: Executes a task in the specified session
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the session
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               task:
+ *                 type: string
+ *                 description: The task to execute
+ *     responses:
+ *       200:
+ *         description: Task execution started
+ *       404:
+ *         description: Session not found
+ */
+app.post('/api/sessions/:session_id/task', (req, res) => {
+  const { session_id } = req.params;
+  const { task } = req.body;
+  
+  if (!sessions[session_id]) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  // Update last activity timestamp
+  sessions[session_id].last_activity = new Date().toISOString();
+  
+  // For now, just acknowledge the task
+  res.json({ success: true, message: 'Task received, execution started' });
+  
+  // In a real implementation, you would execute the task with client.js
+  // and store responses for retrieval via the /responses endpoint
+});
+
+/**
+ * @swagger
+ * /api/sessions:
+ *   post: 
+ *     tags:
+ *       - Sessions
  *     summary: Create a new session
  *     description: Creates a new browser session
  *     responses:
@@ -337,7 +440,7 @@ app.get('/tools', (req, res) => {
  *                   format: date-time
  *                   example: 2023-01-01T00:00:00.000Z
  */
-app.post('/sessions', async (req, res) => {
+app.post('/api/sessions', async (req, res) => {
   try {
     const sessionId = uuidv4();
     sessions[sessionId] = {
@@ -361,8 +464,10 @@ app.post('/sessions', async (req, res) => {
 
 /**
  * @swagger
- * /sessions/{session_id}:
- *   get:
+ * /api/sessions/{session_id}:
+ *   get: 
+ *     tags:
+ *       - Sessions
  *     summary: Get session information
  *     description: Returns information about a specific session
  *     parameters:
@@ -394,7 +499,7 @@ app.post('/sessions', async (req, res) => {
  *       404:
  *         description: Session not found
  */
-app.get('/sessions/:session_id', (req, res) => {
+app.get('/api/sessions/:session_id', (req, res) => {
   const { session_id } = req.params;
   
   if (!sessions[session_id]) {
@@ -406,8 +511,10 @@ app.get('/sessions/:session_id', (req, res) => {
 
 /**
  * @swagger
- * /sessions/{session_id}:
- *   delete:
+ * /api/sessions/{session_id}:
+ *   delete: 
+ *     tags:
+ *       - Sessions
  *     summary: Delete a session
  *     description: Closes a browser session and cleans up resources
  *     parameters:
@@ -433,7 +540,7 @@ app.get('/sessions/:session_id', (req, res) => {
  *       500:
  *         description: Error cleaning up session
  */
-app.delete('/sessions/:session_id', async (req, res) => {
+app.delete('/api/sessions/:session_id', async (req, res) => {
   try {
     const { session_id } = req.params;
     
@@ -453,8 +560,10 @@ app.delete('/sessions/:session_id', async (req, res) => {
 
 /**
  * @swagger
- * /screenshots/{session_id}:
- *   get:
+ * /api/screenshots/{session_id}:
+ *   get: 
+ *     tags:
+ *       - Resources
  *     summary: Get screenshots for a session
  *     description: Returns a list of screenshots for a specific session
  *     parameters:
@@ -490,7 +599,7 @@ app.delete('/sessions/:session_id', async (req, res) => {
  *       404:
  *         description: Session not found or no screenshots available
  */
-app.get('/screenshots/:session_id', (req, res) => {
+app.get('/api/screenshots/:session_id', (req, res) => {
   try {
     const { session_id } = req.params;
     
@@ -525,8 +634,10 @@ app.get('/screenshots/:session_id', (req, res) => {
 
 /**
  * @swagger
- * /downloads/{session_id}:
- *   get:
+ * /api/downloads/{session_id}:
+ *   get: 
+ *     tags:
+ *       - Resources
  *     summary: Get downloads for a session
  *     description: Returns a list of downloaded files for a specific session
  *     parameters:
@@ -562,7 +673,7 @@ app.get('/screenshots/:session_id', (req, res) => {
  *       404:
  *         description: Session not found or no downloads available
  */
-app.get('/downloads/:session_id', (req, res) => {
+app.get('/api/downloads/:session_id', (req, res) => {
   try {
     const { session_id } = req.params;
     
@@ -597,8 +708,10 @@ app.get('/downloads/:session_id', (req, res) => {
 
 /**
  * @swagger
- * /tools/execute:
- *   post:
+ * /api/tools/execute:
+ *   post: 
+ *     tags:
+ *       - Tools
  *     summary: Execute a tool
  *     description: Executes a browser automation tool
  *     requestBody:
@@ -638,7 +751,7 @@ app.get('/downloads/:session_id', (req, res) => {
  *       500:
  *         description: Error executing tool
  */
-app.post('/tools/execute', async (req, res) => {
+app.post('/api/tools/execute', async (req, res) => {
   try {
     const { tool_name, arguments: args, session_id } = req.body;
     const sessionId = session_id || uuidv4();
@@ -728,8 +841,10 @@ app.post('/tools/execute', async (req, res) => {
 
 /**
  * @swagger
- * /resources/{session_id}/{filename}:
- *   get:
+ * /api/resources/{session_id}/{filename}:
+ *   get: 
+ *     tags:
+ *       - Resources
  *     summary: Get a resource
  *     description: Returns the content of a resource file
  *     parameters:
@@ -762,7 +877,7 @@ app.post('/tools/execute', async (req, res) => {
  *       404:
  *         description: Resource not found
  */
-app.get('/resources/:session_id/:filename', (req, res) => {
+app.get('/api/resources/:session_id/:filename', (req, res) => {
   try {
     const { session_id, filename } = req.params;
     const filePath = path.join('artifacts', session_id, filename);
@@ -780,6 +895,51 @@ app.get('/resources/:session_id/:filename', (req, res) => {
     logger.error(`Error getting resource: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
+});
+
+/**
+ * @swagger
+ * /api/sessions/{session_id}/responses:
+ *   get:
+ *     tags:
+ *       - Sessions
+ *     summary: Get pending responses for a session
+ *     description: Returns any pending responses for the specified session
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the session
+ *     responses:
+ *       200:
+ *         description: List of pending responses
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 responses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       404:
+ *         description: Session not found
+ */
+app.get('/api/sessions/:session_id/responses', (req, res) => {
+  const { session_id } = req.params;
+  
+  if (!sessions[session_id]) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  // Update last activity timestamp
+  sessions[session_id].last_activity = new Date().toISOString();
+  
+  // Since we don't have a pending responses mechanism in server.js,
+  // just return an empty array for now
+  res.json({ responses: [] });
 });
 
 // Get or create browser context
