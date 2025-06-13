@@ -6,6 +6,7 @@ import InputContainer from './Input/InputContainer';
 import ImageModal from './Modals/ImageModal';
 import './ChatInterface.css';
 
+//FIXME: Ensure Web_interface correcytly consume client.js for iunlligence and tools
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/api';
 
 function ChatInterface({ user }) {
