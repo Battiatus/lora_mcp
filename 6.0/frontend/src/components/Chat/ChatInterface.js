@@ -6,8 +6,9 @@ import InputContainer from './Input/InputContainer';
 import ImageModal from './Modals/ImageModal';
 import './ChatInterface.css';
 
-//FIXME: Ensure Web_interface correcytly consume client.js for iunlligence and tools
+// Utiliser la variable d'environnement ou un fallback vers la racine du serveur actuel
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/api';
+console.log('Using API base URL:', API_BASE_URL);
 
 function ChatInterface({ user }) {
   const [sessionId, setSessionId] = useState(null);
@@ -28,10 +29,13 @@ function ChatInterface({ user }) {
         setInitializing(true);
         setConnectionError(null);
         
-        const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+        // Utiliser l'URL API_BASE_URL pour s'assurer que nous passons par le web_interface
+        const response = await fetch(`${API_BASE_URL}/sessions`, {
           method: 'POST',
+          credentials: 'omit',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'session-type': 'hello'
           }
         });
         
@@ -77,7 +81,7 @@ function ChatInterface({ user }) {
       }
       
       if (sessionId) {
-        fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+        fetch(`${API_BASE_URL}/sessions/${sessionId}`, {
           method: 'DELETE'
         }).catch(err => console.error('Error cleaning up session:', err));
       }
@@ -96,7 +100,7 @@ function ChatInterface({ user }) {
       if (!sid) return;
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/sessions/${sid}/responses`);
+        const response = await fetch(`${API_BASE_URL}/sessions/${sid}/responses`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch responses: ${response.status} ${response.statusText}`);
@@ -370,8 +374,10 @@ function ChatInterface({ user }) {
       const endpoint = mode === 'task' ? 'task' : 'chat';
       const payload = mode === 'task' ? { task: message } : { message };
       
-      const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/${endpoint}`, {
+      // Utiliser l'URL définie par API_BASE_URL
+      const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/${endpoint}`, {
         method: 'POST',
+        credentials: 'omit',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -396,8 +402,9 @@ function ChatInterface({ user }) {
         
         // Try to reconnect by creating a new session
         try {
-          const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+          const response = await fetch(`${API_BASE_URL}/sessions`, {
             method: 'POST',
+            credentials: 'omit',
             headers: {
               'Content-Type': 'application/json'
             }
