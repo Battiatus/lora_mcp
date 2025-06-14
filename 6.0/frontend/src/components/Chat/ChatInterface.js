@@ -4,6 +4,9 @@ import Sidebar from './Sidebar/Sidebar';
 import MessageContainer from './Messages/MessageContainer';
 import InputContainer from './Input/InputContainer';
 import ImageModal from './Modals/ImageModal';
+import MessageHistory from './History/MessageHistory';
+import SettingsPanel from './Settings/SettingsPanel';
+import ThemeToggler from '../ThemeToggler';
 import './ChatInterface.css';
 
 // Utiliser la variable d'environnement ou un fallback vers la racine du serveur actuel
@@ -19,7 +22,43 @@ function ChatInterface({ user }) {
   const [connected, setConnected] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile sidebar
+  const [userSettings, setUserSettings] = useState({
+    enableAutoSave: true,
+    markdownRendering: true,
+    enableNotifications: true,
+    messageSound: true
+  });
   const pollingIntervalRef = useRef(null);
+  const notificationSound = useRef(new Audio('/message-notification.mp3'));
+  
+  // Load user settings
+  useEffect(() => {
+    const loadSettings = () => {
+      try {
+        const savedSettings = localStorage.getItem('app_settings');
+        if (savedSettings) {
+          const parsedSettings = JSON.parse(savedSettings);
+          setUserSettings(prevSettings => ({ ...prevSettings, ...parsedSettings }));
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    };
+    
+    loadSettings();
+    
+    // Listen for settings changes
+    const handleSettingsChange = (e) => {
+      setUserSettings(e.detail);
+    };
+    
+    window.addEventListener('settings-changed', handleSettingsChange);
+    
+    return () => {
+      window.removeEventListener('settings-changed', handleSettingsChange);
+    };
+  }, []);
   
   // Créer une session au chargement initial
   useEffect(() => {
@@ -53,7 +92,7 @@ function ChatInterface({ user }) {
         setSessionId(data.session_id);
         setConnected(true);
         
-        // Welcome message
+        // Welcome message with improved animation
         setMessages([{
           id: 'welcome',
           type: 'system',
@@ -124,6 +163,8 @@ function ChatInterface({ user }) {
   };
   
   const processResponses = (responses) => {
+    let shouldPlaySound = false;
+    
     for (const response of responses) {
       switch (response.type) {
         case 'typing':
@@ -133,11 +174,13 @@ function ChatInterface({ user }) {
         case 'assistant_message':
           setTyping(false);
           addMessage('assistant', response.message);
+          shouldPlaySound = true;
           break;
           
         case 'assistant_tool_call':
           setTyping(false);
           addMessage('assistant', response.message);
+          shouldPlaySound = true;
           break;
           
         case 'tool_executing':
@@ -194,6 +237,7 @@ function ChatInterface({ user }) {
           completeTaskProgress(response.steps);
           if (response.message && response.message !== "Task completed successfully!") {
             addMessage('assistant', response.message);
+            shouldPlaySound = true;
           }
           break;
           
@@ -210,6 +254,27 @@ function ChatInterface({ user }) {
           console.warn('Unknown response type:', response.type);
       }
     }
+    
+    // Play notification sound if needed and enabled
+    if (shouldPlaySound && userSettings.messageSound && userSettings.enableNotifications) {
+      try {
+        notificationSound.current.play().catch(err => console.log('Audio play error:', err));
+      } catch (error) {
+        console.error('Failed to play notification sound:', error);
+      }
+    }
+    
+    // Show desktop notification if enabled
+    if (shouldPlaySound && userSettings.enableNotifications && 'Notification' in window) {
+      if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+        new Notification('New Message', {
+          body: 'You have received a new message from MCP Assistant',
+          icon: '/logo192.png'
+        });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+    }
   };
   
   const addMessage = (sender, content, type = 'normal') => {
@@ -222,6 +287,48 @@ function ChatInterface({ user }) {
     };
     
     setMessages(prevMessages => [...prevMessages, newMessage]);
+    
+    // Auto-save session if enabled
+    if (userSettings.enableAutoSave && sessionId) {
+      saveSessionToHistory([...messages, newMessage]);
+    }
+  };
+  
+  const saveSessionToHistory = (currentMessages) => {
+    try {
+      // Get existing sessions
+      const savedSessionsJSON = localStorage.getItem('chat_sessions') || '[]';
+      let savedSessions = JSON.parse(savedSessionsJSON);
+      
+      // Check if current session exists
+      const existingSessionIndex = savedSessions.findIndex(session => session.id === sessionId);
+      
+      const sessionData = {
+        id: sessionId,
+        title: `Chat ${new Date().toLocaleDateString()}`,
+        timestamp: new Date().toISOString(),
+        messages: currentMessages
+      };
+      
+      if (existingSessionIndex !== -1) {
+        // Update existing session
+        savedSessions[existingSessionIndex] = sessionData;
+      } else {
+        // Add new session
+        savedSessions.push(sessionData);
+        
+        // Limit the number of saved sessions (get from settings)
+        const maxSessions = userSettings.maxHistorySessions || 20;
+        if (savedSessions.length > maxSessions) {
+          savedSessions = savedSessions.slice(-maxSessions);
+        }
+      }
+      
+      // Save back to localStorage
+      localStorage.setItem('chat_sessions', JSON.stringify(savedSessions));
+    } catch (error) {
+      console.error('Error saving session to history:', error);
+    }
   };
   
   const addTaskProgress = (message) => {
@@ -390,6 +497,11 @@ function ChatInterface({ user }) {
       
       const data = await response.json();
       console.log('Message sent successfully:', data);
+      
+      // Close sidebar on mobile after sending message
+      if (window.innerWidth <= 768) {
+        setSidebarOpen(false);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       setTyping(false);
@@ -473,6 +585,27 @@ function ChatInterface({ user }) {
     setModalImage(null);
   };
   
+  // Toggle sidebar on mobile
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+  
+  // Load a session from history
+  const handleLoadSession = (loadedSessionId) => {
+    try {
+      const savedSessionsJSON = localStorage.getItem('chat_sessions') || '[]';
+      const savedSessions = JSON.parse(savedSessionsJSON);
+      
+      const session = savedSessions.find(s => s.id === loadedSessionId);
+      
+      if (session) {
+        setMessages(session.messages);
+      }
+    } catch (error) {
+      console.error('Error loading session:', error);
+    }
+  };
+  
   // Ajouter une erreur de connexion si besoin
   const connectionMessage = connectionError ? (
     <div className="connection-error">
@@ -483,12 +616,25 @@ function ChatInterface({ user }) {
   
   return (
     <div className="app-container">
+      {/* Mobile sidebar toggle button */}
+      {window.innerWidth <= 768 && (
+        <button className="sidebar-toggle" onClick={toggleSidebar}>
+          <i className={`fas fa-${sidebarOpen ? 'times' : 'bars'}`}></i>
+        </button>
+      )}
+      
+      {/* Sidebar overlay for mobile */}
+      {sidebarOpen && window.innerWidth <= 768 && (
+        <div className="sidebar-overlay show" onClick={() => setSidebarOpen(false)}></div>
+      )}
+      
       <Sidebar 
         mode={mode}
         setMode={setMode}
         connected={connected}
         user={user}
         onLogout={handleLogout}
+        isOpen={sidebarOpen}
       />
       
       <div className="main-content">
@@ -497,11 +643,11 @@ function ChatInterface({ user }) {
           <div className="chat-controls">
             <button className="control-btn" onClick={handleClearChat}>
               <i className="fas fa-trash"></i>
-              Clear Chat
+              <span className="control-btn-text">Clear</span>
             </button>
             <button className="control-btn" onClick={handleExportChat}>
               <i className="fas fa-download"></i>
-              Export
+              <span className="control-btn-text">Export</span>
             </button>
           </div>
         </div>
@@ -511,7 +657,8 @@ function ChatInterface({ user }) {
         <div className="chat-container">
           <MessageContainer 
             messages={messages} 
-            onImageClick={showImageModal} 
+            onImageClick={showImageModal}
+            useMarkdown={userSettings.markdownRendering}
           />
           
           <InputContainer 
@@ -523,6 +670,21 @@ function ChatInterface({ user }) {
         </div>
       </div>
       
+      {/* Message History Panel */}
+      {userSettings.enableHistory && (
+        <MessageHistory 
+          onSelectSession={handleLoadSession} 
+          currentSessionId={sessionId}
+        />
+      )}
+      
+      {/* Settings Panel */}
+      <SettingsPanel />
+      
+      {/* Theme Toggler */}
+      <ThemeToggler />
+      
+      {/* Image Modal */}
       {modalImage && (
         <ImageModal 
           image={modalImage}
