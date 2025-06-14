@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import Login from './components/Auth/Login.js';
+import Login from './components/Auth/Auth.js';
 import Register from './components/Auth/Register.js';
 import ChatInterface from './components/Chat/ChatInterface.js';
 import './App.css';
@@ -56,7 +56,7 @@ function App() {
         />
         <Route
           path="/register"
-          element={user ? <Navigate to="/" /> : <Register />}
+          element={user ? <Navigate to="/" /> : <Login />}
         />
         <Route
           path="/"
