@@ -3,9 +3,10 @@ import Message from './Message.js';
 import ToolMessage from './ToolMessage.js';
 import TaskProgress from './TaskProgress.js';
 import ImageMessage from './ImageMessage.js';
+import MarkdownRenderer from '../Markdown/MarkdownRenderer.js';
 import './Messages.css';
 
-function MessageContainer({ messages, onImageClick }) {
+function MessageContainer({ messages, onImageClick, useMarkdown = true }) {
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -53,7 +54,8 @@ function MessageContainer({ messages, onImageClick }) {
               return (
                 <Message 
                   key={message.id} 
-                  message={message} 
+                  message={message}
+                  useMarkdown={useMarkdown}
                 />
               );
               
@@ -61,7 +63,8 @@ function MessageContainer({ messages, onImageClick }) {
               return (
                 <ToolMessage 
                   key={message.id} 
-                  message={message} 
+                  message={message}
+                  expandByDefault={window.settings?.autoExpandToolOutput}
                 />
               );
               
