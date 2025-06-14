@@ -3,11 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import Login from './components/Auth/Auth.js';
-import Register from './components/Auth/Register.js';
 import ChatInterface from './components/Chat/ChatInterface.js';
+import ThemeToggler from './components/ThemeToggler.js'; // Import the ThemeToggler component
 import './App.css';
-
-
 
 // Firebase configuration
 const firebaseConfig = {
@@ -19,7 +17,7 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_FIREBASE_APP_ID
 };
 
-console.log (firebaseConfig);
+console.log(firebaseConfig);
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -42,13 +40,14 @@ function App() {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Loading...</p>
+        <p>Loading application...</p>
       </div>
     );
   }
 
   return (
     <Router>
+      <ThemeToggler /> {/* Add the ThemeToggler component */}
       <Routes>
         <Route
           path="/login"
