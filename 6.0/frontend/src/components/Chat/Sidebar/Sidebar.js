@@ -1,12 +1,11 @@
-
 import React from 'react';
 import QuickActions from './QuickActions.js';
 import ExampleCommands from './ExampleCommands.js';
 import './Sidebar.css';
 
-function Sidebar({ mode, setMode, connected, user, onLogout }) {
+function Sidebar({ mode, setMode, connected, user, onLogout, isOpen }) {
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
         <div className="logo">
           <i className="fas fa-robot"></i>
@@ -38,6 +37,7 @@ function Sidebar({ mode, setMode, connected, user, onLogout }) {
       
       <div className="sidebar-content">
         <div className="mode-selector">
+          <h3>Mode</h3>
           <button 
             className={`mode-btn ${mode === 'chat' ? 'active' : ''}`}
             onClick={() => setMode('chat')}
@@ -54,9 +54,29 @@ function Sidebar({ mode, setMode, connected, user, onLogout }) {
           </button>
         </div>
         
-        <QuickActions setMessage={message => document.getElementById('messageInput').value = message} />
+        <QuickActions setMessage={message => {
+          const input = document.getElementById('messageInput');
+          if (input) {
+            input.value = message;
+            // Trigger a change event to update the state in InputContainer
+            const event = new Event('input', { bubbles: true });
+            input.dispatchEvent(event);
+            // Focus the input after setting the message
+            input.focus();
+          }
+        }} />
         
-        <ExampleCommands setMessage={message => document.getElementById('messageInput').value = message} />
+        <ExampleCommands setMessage={message => {
+          const input = document.getElementById('messageInput');
+          if (input) {
+            input.value = message;
+            // Trigger a change event to update the state in InputContainer
+            const event = new Event('input', { bubbles: true });
+            input.dispatchEvent(event);
+            // Focus the input after setting the message
+            input.focus();
+          }
+        }} />
       </div>
     </div>
   );
