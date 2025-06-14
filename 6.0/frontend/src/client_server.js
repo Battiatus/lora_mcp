@@ -41,7 +41,7 @@ class SessionManager {
   }
 
   async createSession() {
-    try {
+    try {8081/api-docs
       // Générer un ID de session
       const sessionId = uuidv4();
       logger.info(`Creating new session: ${sessionId}`);
