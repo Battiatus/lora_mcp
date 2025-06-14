@@ -3,9 +3,10 @@ import './Input.css';
 
 function InputContainer({ onSendMessage, mode, typing, disabled }) {
   const [message, setMessage] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef(null);
   
-  // Debug output pour comprendre les valeurs des props
+  // Debug output for understanding prop values
   useEffect(() => {
     console.log("InputContainer props:", { mode, typing, disabled, hasMessage: Boolean(message.trim()) });
   }, [mode, typing, disabled, message]);
@@ -29,21 +30,29 @@ function InputContainer({ onSendMessage, mode, typing, disabled }) {
       handleSend();
     }
   };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+  };
   
   const handleSend = () => {
-    // Vérifier si le message n'est pas vide et que l'interface n'est pas désactivée
+    // Check if message is not empty and interface is not disabled
     if (!message.trim() || disabled) {
-      console.log("Impossible d'envoyer le message:", 
-        !message.trim() ? "Message vide" : "Interface désactivée");
+      console.log("Cannot send message:", 
+        !message.trim() ? "Message empty" : "Interface disabled");
       return;
     }
     
-    console.log("Envoi du message:", message);
+    console.log("Sending message:", message);
     
-    // Envoyer le message
+    // Send message
     onSendMessage(message);
     
-    // Effacer le message après l'envoi
+    // Clear message after sending
     setMessage('');
     
     // Reset textarea height
@@ -52,25 +61,30 @@ function InputContainer({ onSendMessage, mode, typing, disabled }) {
     }
   };
   
-  // Déterminer si le bouton devrait être désactivé
+  // Determine if button should be disabled
   const isButtonDisabled = !message.trim() || disabled;
   
   return (
     <div className="input-container">
-      <div className={`input-wrapper ${disabled ? 'disabled' : ''}`}>
+      <div className={`input-wrapper ${disabled ? 'disabled' : ''} ${isFocused ? 'focused' : ''}`}>
+        <div className="input-icon">
+          <i className={`fas fa-${mode === 'task' ? 'tasks' : 'comment-alt'}`}></i>
+        </div>
         <textarea 
           id="messageInput"
           ref={textareaRef}
           value={message}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           placeholder={
             mode === 'task'
-              ? 'Décrivez une tâche complexe à automatiser...'
-              : 'Tapez votre message ou posez une question...'
+              ? 'Describe a complex task to automate...'
+              : 'Type your message or ask a question...'
           }
           rows="1"
-          disabled={disabled} // Il est important de désactiver la zone de texte si disabled est true
+          disabled={disabled}
           className={disabled ? 'disabled' : ''}
         />
         <div className="input-actions">
@@ -80,10 +94,10 @@ function InputContainer({ onSendMessage, mode, typing, disabled }) {
             disabled={isButtonDisabled}
             title={
               disabled 
-                ? "La session n'est pas active. Créez une nouvelle session."
+                ? "Session not active. Create a new session."
                 : !message.trim() 
-                  ? "Veuillez entrer un message" 
-                  : "Envoyer"
+                  ? "Please enter a message" 
+                  : "Send"
             }
           >
             <i className="fas fa-paper-plane"></i>
@@ -91,22 +105,22 @@ function InputContainer({ onSendMessage, mode, typing, disabled }) {
         </div>
       </div>
       <div className="input-footer">
-        <span className="input-hint">Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne</span>
+        <span className="input-hint">Press Enter to send, Shift+Enter for a new line</span>
         <div className={`typing-indicator ${typing ? 'show' : ''}`}>
           <div className="typing-dots">
             <span></span>
             <span></span>
             <span></span>
           </div>
-          <span>L'assistant réfléchit...</span>
+          <span>Assistant is thinking...</span>
         </div>
       </div>
       
-      {/* Message d'état pour indiquer pourquoi l'entrée est désactivée */}
+      {/* Status message when input is disabled */}
       {disabled && (
         <div className="input-status-message">
           <i className="fas fa-info-circle"></i>
-          Créez une nouvelle session pour commencer à discuter
+          Create a new session to start chatting
         </div>
       )}
     </div>
