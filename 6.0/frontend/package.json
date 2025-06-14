@@ -25,7 +25,11 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "start:client-server": "node src/client_server.js",
+    "start:web-interface": "node src/web_interface.js",
+    "start:all": "concurrently \"npm run start:client-server\" \"npm run start:web-interface\" \"npm start\"",
+    "start:servers": "concurrently \"npm run start:client-server\" \"npm run start:web-interface\""
   },
   "eslintConfig": {
     "extends": [
@@ -45,5 +49,8 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:8082, http://localhost:8085"
+  "proxy": "http://localhost:8082",
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
 }
