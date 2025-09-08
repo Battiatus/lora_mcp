@@ -1,3 +1,3 @@
 # Lora
 ---
-MCP server and client service 
+MCP server and client service (beta)
