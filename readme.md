@@ -5,7 +5,6 @@ A multi-version repository for LoRa MCP (Master Control Program) development and
 ## Structure
 
 This repository contains several directories, each representing a different version or major iteration of the project:
-
 - `2.0/`
 - `3.0/`
 - `4.0/`
