@@ -11,7 +11,7 @@ __pycache__/
 *screenshot*
 # Logs
 
-
+# modules
 *node_modules
 *package-lock.json
 *.npmrc
